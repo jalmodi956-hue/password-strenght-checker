@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
+    // --------------------------------
+    // Main Password Checker Elements
+    // --------------------------------
     const passwordInput = document.getElementById("password");
     const toggleBtn = document.getElementById("togglePassword");
     const copyBtn = document.getElementById("copyPassword");
@@ -7,20 +10,28 @@ document.addEventListener("DOMContentLoaded", function () {
     const strengthText = document.getElementById("strengthText");
     const scoreText = document.getElementById("scoreText");
 
-    // Optional live preview fields (if present in HTML)
     const liveEntropy = document.getElementById("liveEntropy");
     const liveCrackTime = document.getElementById("liveCrackTime");
     const liveFeedback = document.getElementById("liveFeedback");
 
+    // --------------------------------
+    // Password Generator Elements
+    // --------------------------------
+    const generatedPasswordText = document.getElementById("generatedPasswordText");
+    const copyGeneratedBtn = document.getElementById("copyGeneratedPassword");
+
+    // --------------------------------
+    // Weak Password List
+    // --------------------------------
     const COMMON_WEAK_PASSWORDS = [
         "123456", "123456789", "password", "admin", "qwerty",
         "abc123", "letmein", "welcome", "iloveyou", "000000",
         "password123", "admin123", "india123", "test123"
     ];
 
-    // -------------------------
+    // --------------------------------
     // Helper Functions
-    // -------------------------
+    // --------------------------------
     function hasRepeatedChars(password) {
         return /(.)\1{2,}/.test(password);
     }
@@ -73,7 +84,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (entropy <= 0) return "Instantly";
 
         const guesses = Math.pow(2, entropy);
-        const guessesPerSecond = 1000000000; // demo estimate
+        const guessesPerSecond = 1000000000;
         const seconds = guesses / guessesPerSecond;
 
         if (seconds < 1) return "Less than 1 second";
@@ -86,9 +97,9 @@ document.addEventListener("DOMContentLoaded", function () {
         return "Many years";
     }
 
-    // -------------------------
+    // --------------------------------
     // Password Strength Engine
-    // -------------------------
+    // --------------------------------
     function checkStrength(password) {
         let score = 0;
         let feedback = [];
@@ -129,6 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Bonus
         const specialCount = (password.match(/[^A-Za-z0-9]/g) || []).length;
         if (specialCount >= 2) score += 6;
+
         if (new Set(password).size >= 8) score += 5;
 
         // Penalties
@@ -152,7 +164,6 @@ document.addEventListener("DOMContentLoaded", function () {
             feedback.push("Avoid keyboard patterns like qwerty or asdf");
         }
 
-        // Clamp score
         score = Math.max(0, Math.min(score, 100));
 
         let strength = "Weak";
@@ -188,10 +199,10 @@ document.addEventListener("DOMContentLoaded", function () {
         };
     }
 
-    // -------------------------
-    // Live UI Update
-    // -------------------------
-    function renderLiveFeedback(feedback, strength) {
+    // --------------------------------
+    // Render Live Feedback
+    // --------------------------------
+    function renderLiveFeedback(feedback) {
         if (!liveFeedback) return;
 
         if (!feedback || feedback.length === 0) {
@@ -199,11 +210,13 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        // Keep max 4 live feedback lines for cleaner UI
         const limited = feedback.slice(0, 4);
         liveFeedback.innerHTML = limited.map(item => `<li>${item}</li>`).join("");
     }
 
+    // --------------------------------
+    // Update Strength UI
+    // --------------------------------
     function updateStrengthUI() {
         if (!passwordInput || !strengthBar || !strengthText || !scoreText) return;
 
@@ -226,16 +239,16 @@ document.addEventListener("DOMContentLoaded", function () {
             liveCrackTime.textContent = result.crackTime;
         }
 
-        renderLiveFeedback(result.feedback, result.strength);
+        renderLiveFeedback(result.feedback);
     }
 
     if (passwordInput) {
         passwordInput.addEventListener("input", updateStrengthUI);
     }
 
-    // -------------------------
+    // --------------------------------
     // Show / Hide Password
-    // -------------------------
+    // --------------------------------
     if (toggleBtn && passwordInput) {
         toggleBtn.addEventListener("click", function () {
             if (passwordInput.type === "password") {
@@ -248,9 +261,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // -------------------------
-    // Copy Password
-    // -------------------------
+    // --------------------------------
+    // Copy Main Password
+    // --------------------------------
     if (copyBtn && passwordInput) {
         copyBtn.addEventListener("click", function () {
             const value = passwordInput.value.trim();
@@ -274,6 +287,34 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Initial render
+    // --------------------------------
+    // Copy Generated Password
+    // --------------------------------
+    if (copyGeneratedBtn && generatedPasswordText) {
+        copyGeneratedBtn.addEventListener("click", function () {
+            const value = generatedPasswordText.textContent.trim();
+
+            if (!value) {
+                alert("No generated password found.");
+                return;
+            }
+
+            navigator.clipboard.writeText(value)
+                .then(() => {
+                    const oldText = copyGeneratedBtn.textContent;
+                    copyGeneratedBtn.textContent = "Copied!";
+                    setTimeout(() => {
+                        copyGeneratedBtn.textContent = oldText || "Copy";
+                    }, 1500);
+                })
+                .catch(() => {
+                    alert("Failed to copy generated password.");
+                });
+        });
+    }
+
+    // --------------------------------
+    // Initial Render
+    // --------------------------------
     updateStrengthUI();
 });

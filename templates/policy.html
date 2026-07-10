@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Policy - Cyber Password Security Engine</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="cyber-bg"></div>
+
+    <div class="container">
+        <h1 class="page-title">PASSWORD POLICY SETTINGS</h1>
+        <p class="page-subtitle">Customize your password security requirements.</p>
+
+        <div class="nav-links" style="margin-top:0; margin-bottom:20px;">
+            <a href="{{ url_for('index') }}">🏠 Home</a>
+            <a href="{{ url_for('history') }}">📜 History</a>
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
+            <a href="{{ url_for('logout') }}">🚪 Logout</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-container">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" class="panel-box neon-box">
+            <h3>UPDATE POLICY</h3>
+
+            <div class="form-group">
+                <label for="min_length">Minimum Length</label>
+                <input type="number" name="min_length" id="min_length" min="4" max="64"
+                       value="{{ policy.min_length if policy else 8 }}" required>
+            </div>
+
+            <div class="checkbox-grid">
+                <label class="checkbox-item">
+                    <input type="checkbox" name="require_uppercase"
+                           {% if policy and policy.require_uppercase %}checked{% endif %}>
+                    Require Uppercase
+                </label>
+
+                <label class="checkbox-item">
+                    <input type="checkbox" name="require_lowercase"
+                           {% if policy and policy.require_lowercase %}checked{% endif %}>
+                    Require Lowercase
+                </label>
+
+                <label class="checkbox-item">
+                    <input type="checkbox" name="require_digit"
+                           {% if policy and policy.require_digit %}checked{% endif %}>
+                    Require Digit
+                </label>
+
+                <label class="checkbox-item">
+                    <input type="checkbox" name="require_special"
+                           {% if policy and policy.require_special %}checked{% endif %}>
+                    Require Special Character
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-20">Save Policy</button>
+        </form>
+    </div>
+</body>
+</html>

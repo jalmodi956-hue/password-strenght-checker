@@ -3,83 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Scan History</title>
+    <title>Scan History - Cyber Password Security Engine</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <div class="cyber-bg"></div>
 
     <div class="container">
-        <h1>Password Scan History</h1>
-        <p class="subtitle">
-            View all previously checked passwords with score, strength, entropy, crack time and scan date.
-        </p>
+        <h1 class="page-title">SCAN HISTORY</h1>
+        <p class="page-subtitle">View your saved password scan records.</p>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
-            <div class="nav-links" style="margin-top:0;">
-                <a href="{{ url_for('index') }}">🏠 Home</a>
-                <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-                <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
-            </div>
-
-            <form action="{{ url_for('clear_history') }}" method="POST"
-                  onsubmit="return confirm('Are you sure you want to clear all history?');">
-                <button type="submit" class="btn-warning">🗑 Clear All History</button>
-            </form>
+        <div class="nav-links" style="margin-top:0; margin-bottom:20px;">
+            <a href="{{ url_for('index') }}">🏠 Home</a>
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
+            <a href="{{ url_for('policy') }}">⚙ Policy</a>
+            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
+            <a href="{{ url_for('export_pdf') }}">🧾 Export PDF</a>
+            <a href="{{ url_for('logout') }}">🚪 Logout</a>
         </div>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Password</th>
-                        <th>Score</th>
-                        <th>Strength</th>
-                        <th>Entropy</th>
-                        <th>Crack Time</th>
-                        <th>Scan Time</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if records %}
+        {% if records and records|length > 0 %}
+        <div class="panel-box neon-box">
+            <div class="score-row">
+                <h3 style="margin-bottom:0;">HISTORY RECORDS</h3>
+                <form method="POST" action="{{ url_for('clear_history') }}"
+                      onsubmit="return confirm('Are you sure you want to clear all history?');">
+                    <button type="submit" class="btn btn-danger">Clear All History</button>
+                </form>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Password</th>
+                            <th>Score</th>
+                            <th>Strength</th>
+                            <th>Entropy</th>
+                            <th>Crack Time</th>
+                            <th>Scan Time</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         {% for row in records %}
                         <tr>
-                            <td>{{ row[0] }}</td>
-                            <td>{{ row[1] }}</td>
-                            <td>{{ row[2] }}/100</td>
-
+                            <td>{{ row.id }}</td>
+                            <td>{{ row.password_text }}</td>
+                            <td>{{ row.score }}</td>
                             <td>
-                                {% if row[3] == 'Weak' %}
-                                    <span class="badge badge-weak">{{ row[3] }}</span>
-                                {% elif row[3] == 'Medium' %}
-                                    <span class="badge badge-medium">{{ row[3] }}</span>
+                                {% if row.strength == "Weak" %}
+                                    <span class="badge badge-weak">Weak</span>
+                                {% elif row.strength == "Medium" %}
+                                    <span class="badge badge-medium">Medium</span>
                                 {% else %}
-                                    <span class="badge badge-strong">{{ row[3] }}</span>
+                                    <span class="badge badge-strong">Strong</span>
                                 {% endif %}
                             </td>
-
-                            <td>{{ row[5] }}</td>
-                            <td>{{ row[6] }}</td>
-                            <td>{{ row[7] }}</td>
-
+                            <td>{{ row.entropy }}</td>
+                            <td>{{ row.crack_time }}</td>
+                            <td>{{ row.scan_time }}</td>
                             <td>
-                                <form action="{{ url_for('delete_history', record_id=row[0]) }}" method="POST"
+                                <form method="POST"
+                                      action="{{ url_for('delete_history', record_id=row.id) }}"
                                       onsubmit="return confirm('Delete this record?');">
-                                    <button type="submit" class="btn-secondary">Delete</button>
+                                    <button type="submit" class="btn btn-danger">Delete</button>
                                 </form>
                             </td>
                         </tr>
                         {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="8">No password scan history found.</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
+        {% else %}
+        <div class="panel-box neon-box center">
+            <h3>No History Found</h3>
+            <p style="color:#9fc8e2;">No password scans have been saved yet.</p>
+        </div>
+        {% endif %}
     </div>
-
 </body>
 </html>
+

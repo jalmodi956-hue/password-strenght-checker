@@ -3,14 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Checker Dashboard</title>
+    <title>Dashboard - Cyber Password Security Engine</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <div class="cyber-bg"></div>
 
     <div class="container">
-        <h1>Password Strength Checker</h1>
-        <p class="subtitle">Dashboard Overview of Password Scan Results</p>
+        <h1 class="page-title">SECURITY DASHBOARD</h1>
+        <p class="page-subtitle">Overview of your password scan activity and security results.</p>
+
+        <div class="nav-links" style="margin-top:0; margin-bottom:20px;">
+            <a href="{{ url_for('index') }}">🏠 Home</a>
+            <a href="{{ url_for('history') }}">📜 History</a>
+            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
+            <a href="{{ url_for('policy') }}">⚙ Policy</a>
+            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
+            <a href="{{ url_for('export_pdf') }}">🧾 Export PDF</a>
+            <a href="{{ url_for('logout') }}">🚪 Logout</a>
+        </div>
 
         <div class="dashboard-grid">
             <div class="card total">
@@ -34,12 +45,44 @@
             </div>
         </div>
 
-        <div class="nav-links">
-            <a href="{{ url_for('index') }}">🏠 Home</a>
-            <a href="{{ url_for('history') }}">📜 View History</a>
-            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
+        <div class="panel-box neon-box">
+            <h3>RECENT SCANS</h3>
+
+            {% if recent_scans and recent_scans|length > 0 %}
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Password</th>
+                            <th>Score</th>
+                            <th>Strength</th>
+                            <th>Scan Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in recent_scans %}
+                        <tr>
+                            <td>{{ row.password_text }}</td>
+                            <td>{{ row.score }}</td>
+                            <td>
+                                {% if row.strength == "Weak" %}
+                                    <span class="badge badge-weak">Weak</span>
+                                {% elif row.strength == "Medium" %}
+                                    <span class="badge badge-medium">Medium</span>
+                                {% else %}
+                                    <span class="badge badge-strong">Strong</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.scan_time }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p style="color:#9fc8e2;">No recent scans found.</p>
+            {% endif %}
         </div>
     </div>
-
 </body>
 </html>

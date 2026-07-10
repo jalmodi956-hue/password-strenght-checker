@@ -1,14 +1,25 @@
 # 🔐 Cyber Password Security Engine
 
-A modern **Flask-based Password Strength Checker** with a **cyber / hacker style UI** that analyzes password security using multiple checks such as strength score, entropy, estimated crack time, weak password detection, sequence detection, and history tracking.
+A modern **Flask-based Password Security Analyzer** with a **cyber / hacker style UI** that helps users test password strength, generate secure passwords, manage custom password policies, track scan history, and export reports.
 
 ---
 
-## 🚀 Features
+# 🚀 Features
 
-### 🔍 Password Security Analysis
+## 1) User Authentication
 
-* Password strength score out of **100**
+* User **Login**
+* User **Register**
+* **Logout**
+* **Multi-user support** using SQLite database
+
+---
+
+## 2) Password Strength Analysis
+
+The app analyzes passwords using multiple security checks:
+
+* Password **score out of 100**
 * Strength level:
 
   * **Weak**
@@ -22,46 +33,110 @@ A modern **Flask-based Password Strength Checker** with a **cyber / hacker style
 * Sequence detection (`123`, `abc`, `qwe`)
 * Keyboard pattern detection (`qwerty`, `asdf`)
 
-### 📊 Data & Tracking
+---
 
-* Save password scan history in **SQLite**
-* Store **masked passwords** instead of plain text
-* View full **scan history**
-* **Delete individual records**
-* **Clear all history**
-* **Dashboard analytics**
-* **Export scan history as CSV**
+## 3) Live Security Engine
 
-### 🎨 UI / UX
-
-* Cyber / hacker style dark theme
+* Live password score preview
 * Live strength preview
+* Live entropy preview
+* Live crack time preview
+* Live recommendations while typing
 * Show / hide password
-* Copy password button
-* Security recommendations
-* Responsive design
+* Copy password
 
 ---
 
-## 🛠️ Tech Stack
+## 4) Password Generator
+
+Users can generate strong passwords with custom settings:
+
+* Select password length
+* Include uppercase letters
+* Include lowercase letters
+* Include digits
+* Include special characters
+* Copy generated password
+
+---
+
+## 5) Password Policy Customization
+
+Each user can define their own password policy:
+
+* Minimum password length
+* Require uppercase
+* Require lowercase
+* Require digit
+* Require special character
+
+---
+
+## 6) Password Scan History
+
+Every password scan can be stored in SQLite with:
+
+* Masked password
+* Score
+* Strength
+* Entropy
+* Estimated crack time
+* Scan date and time
+
+History features:
+
+* View all previous scans
+* Delete individual records
+* Clear all history
+
+---
+
+## 7) Security Dashboard
+
+Dashboard shows a quick overview of password scan data:
+
+* Total scans
+* Weak password count
+* Medium password count
+* Strong password count
+* Recent scan records
+
+---
+
+## 8) Report Export
+
+The app supports exporting password scan data as:
+
+* **CSV report**
+* **PDF report**
+
+---
+
+# 🛠️ Tech Stack
 
 * **Backend:** Python, Flask
 * **Frontend:** HTML, CSS, JavaScript
 * **Database:** SQLite
-* **Other Modules:** `re`, `math`, `csv`, `datetime`
+* **PDF Export:** ReportLab
 
 ---
 
-## 📂 Project Structure
+# 📂 Project Structure
 
-```bash
+```bash id="moxc7z"
 Cyber_Password_Security_Engine/
 │
 ├── app.py
+├── README.md
+├── requirements.txt
 ├── password_checker.db
 │
 ├── templates/
 │   ├── index.html
+│   ├── login.html
+│   ├── register.html
+│   ├── generator.html
+│   ├── policy.html
 │   ├── history.html
 │   └── dashboard.html
 │
@@ -72,138 +147,161 @@ Cyber_Password_Security_Engine/
 
 ---
 
-## ⚙️ Installation & Setup
+# ⚙️ Installation & Setup
 
-### 1) Clone the repository
+## 1) Clone the repository
 
-```bash
-git clone <your-repository-link>
-cd Cyber_Password_Security_Engine
+```bash id="e12dd6"
+git clone https://github.com/jalmodi956-hue/password-strenght-checker.git
+cd password-strenght-checker
 ```
 
-### 2) Install Flask
+## 2) Install dependencies
 
-```bash
-pip install flask
+```bash id="80c3dx"
+pip install -r requirements.txt
 ```
 
-### 3) Run the application
+## 3) Run the application
 
-```bash
+```bash id="8jsazx"
 python app.py
 ```
 
-### 4) Open in browser
+## 4) Open in browser
 
-```bash
+```bash id="mk14t8"
 http://127.0.0.1:5000
 ```
 
 ---
 
-## 🧠 How It Works
+# 🔑 Default Login Credentials
 
-The application checks the password using multiple rules:
+A default admin user is automatically created when the app runs for the first time.
 
-* **Length-based scoring**
-* Presence of:
-
-  * uppercase letters
-  * lowercase letters
-  * numbers
-  * special characters
-* Bonus points for:
-
-  * longer passwords
-  * multiple special characters
-  * more unique characters
-* Penalty points for:
-
-  * common weak passwords
-  * repeated characters
-  * simple sequences
-  * keyboard patterns
-
-It also calculates:
-
-* **Entropy**
-* **Estimated crack time**
-
-After analysis, the password scan result is stored in the database with:
-
-* masked password
-* score
-* strength
-* entropy
-* crack time
-* scan date & time
+* **Username:** `admin`
+* **Password:** `admin123`
 
 ---
 
-## 📸 Pages in the Project
+# 🧠 How the Password Scoring Works
 
-### 1. Home Page
+The password engine uses:
 
-* Enter password
-* Run security analysis
-* View score, strength, entropy, crack time
-* See suggestions for improvement
+## Positive checks
 
-### 2. History Page
+* Longer password length
+* Uppercase letters
+* Lowercase letters
+* Numbers
+* Special characters
+* Multiple unique characters
+* More symbol variety
 
-* View all previous scans
-* Delete individual records
-* Clear all history
+## Penalty checks
 
-### 3. Dashboard Page
+* Common weak passwords
+* Repeated characters
+* Sequential patterns
+* Keyboard patterns
 
-* Total scans
-* Weak password count
-* Medium password count
-* Strong password count
-* Recent scans
+The final result includes:
 
----
-
-## 🔐 Example Security Checks
-
-The engine can detect risky passwords such as:
-
-* `123456`
-* `password`
-* `admin123`
-* `aaaa111`
-* `abc123`
-* `qwerty123`
+* Score
+* Strength level
+* Entropy
+* Crack time estimate
+* Security recommendations
 
 ---
 
-## 📤 Export Feature
+# 📄 Pages in the Project
 
-The app allows users to export scan history in **CSV format** for reporting and analysis.
+## 1) Login Page
+
+Allows existing users to log in.
+
+## 2) Register Page
+
+Allows new users to create an account.
+
+## 3) Home Page / Password Checker
+
+Main page for password strength analysis.
+
+## 4) History Page
+
+Displays all saved password scan records.
+
+## 5) Dashboard Page
+
+Displays overall password security statistics.
+
+## 6) Generator Page
+
+Creates strong random passwords based on selected settings.
+
+## 7) Policy Page
+
+Allows users to customize password rules.
 
 ---
 
-## 📌 Future Improvements
+# 🧪 Example Test Passwords
 
-Possible upgrades for the project:
+## Weak
+
+```txt id="jz7zpq"
+123456
+```
+
+## Medium
+
+```txt id="ywdh7x"
+jal12345
+```
+
+## Strong
+
+```txt id="uwx7jk"
+Jal@2026#SecurePass
+```
+
+---
+
+# 📤 Export Features
+
+## CSV Export
+
+Exports all password scan history into a CSV file.
+
+## PDF Export
+
+Exports all password scan history into a PDF report with table format.
+
+---
+
+# 🔮 Future Improvements
+
+Possible future upgrades:
 
 * Password breach API integration
-* Password generator
-* Login / user authentication
-* PDF export report
-* Charts on dashboard
-* Multi-user support
-* Password policy customization
+* Dashboard charts and graphs
+* Password sharing risk analysis
+* AI-based password recommendations
+* Dark/light theme switch
+* Email-based password alerts
+* Admin panel for user management
 
 ---
 
-## 👨‍💻 Author
+# 👨‍💻 Author
 
 **Jal Modi**
 
 ---
 
-## 📜 License
+# 📜 License
 
-This project is for **educational and learning purposes**.
+This project is made for **educational and learning purposes**.

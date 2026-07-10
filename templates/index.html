@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
     <div class="cyber-bg"></div>
 
     <div class="container">
@@ -17,6 +16,32 @@
             <p class="subtitle">
                 Analyze password strength, entropy, estimated crack time, and security risk in real time.
             </p>
+        </div>
+
+        <!-- Top Navigation -->
+        <div class="nav-links" style="margin-top: 0; margin-bottom: 20px;">
+            <a href="{{ url_for('history') }}">📜 Scan History</a>
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('generate_password_route') }}">🔐 Password Generator</a>
+            <a href="{{ url_for('policy') }}">⚙ Policy Settings</a>
+            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
+            <a href="{{ url_for('export_pdf') }}">🧾 Export PDF</a>
+            <a href="{{ url_for('logout') }}">🚪 Logout</a>
+        </div>
+
+        <!-- User Info -->
+        <div class="result-box neon-box">
+            <h3>USER SESSION</h3>
+            <div class="score-row">
+                <span class="score-label">Logged in as:</span>
+                <span class="score-value">{{ username }}</span>
+            </div>
+            {% if policy %}
+            <div class="score-row">
+                <span class="score-label">Current Minimum Length Policy:</span>
+                <span class="score-value">{{ policy.min_length }}</span>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Input Form -->
@@ -49,6 +74,16 @@
                     <span class="stat-label">Strength Level</span>
                     <span class="stat-value strength-text" id="strengthText">Weak</span>
                 </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Live Entropy</span>
+                    <span class="stat-value" id="liveEntropy">0</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Live Crack Time</span>
+                    <span class="stat-value" id="liveCrackTime">Instantly</span>
+                </div>
             </div>
 
             <div class="progress-container">
@@ -56,6 +91,13 @@
             </div>
 
             <p class="scan-note">Live analysis updates as you type.</p>
+
+            <div class="result-box inner-box">
+                <h3>LIVE RECOMMENDATIONS</h3>
+                <ul class="feedback-list" id="liveFeedback">
+                    <li>Type a password to begin live analysis.</li>
+                </ul>
+            </div>
         </div>
 
         {% if result %}
@@ -66,15 +108,15 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <span class="stat-label">Password Score</span>
-                    <span class="stat-value" id="finalScoreValue">
+                    <span class="stat-value {{ result.color_class }}">
                         {{ result.score }}/100
                     </span>
                 </div>
 
                 <div class="stat-card">
                     <span class="stat-label">Strength</span>
-                    <span class="stat-value strength-text" id="finalStrengthValue">
-                        {{ result.strength }}
+                    <span class="stat-value strength-text" data-color="{{ result.color }}">
+                            {{ result.strength }}
                     </span>
                 </div>
 
@@ -90,9 +132,10 @@
             </div>
 
             <div class="progress-container">
-                <div class="progress-bar" id="finalStrengthBar"
-                     data-score="{{ result.score }}"
-                     data-color="{{ result.color }}">
+                <div class="progress-bar"
+                     id="resultProgress"
+                    data-score="{{ result.score }}"
+                    data-color="{{ result.color }}">
                 </div>
             </div>
 
@@ -116,6 +159,47 @@
         </div>
         {% endif %}
 
+        <!-- Current Policy -->
+        {% if policy %}
+        <div class="result-box neon-box">
+            <h3>CURRENT PASSWORD POLICY</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Minimum Length</span>
+                    <span class="stat-value">{{ policy.min_length }}</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Uppercase Required</span>
+                    <span class="stat-value">
+                        {% if policy.require_uppercase %}Yes{% else %}No{% endif %}
+                    </span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Lowercase Required</span>
+                    <span class="stat-value">
+                        {% if policy.require_lowercase %}Yes{% else %}No{% endif %}
+                    </span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Digit Required</span>
+                    <span class="stat-value">
+                        {% if policy.require_digit %}Yes{% else %}No{% endif %}
+                    </span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Special Character Required</span>
+                    <span class="stat-value">
+                        {% if policy.require_special %}Yes{% else %}No{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Security Tips -->
         <div class="result-box neon-box">
             <h3>SECURITY HARDENING TIPS</h3>
@@ -128,39 +212,17 @@
             </ul>
         </div>
 
-        <!-- Navigation -->
+        <!-- Bottom Navigation -->
         <div class="nav-links">
             <a href="{{ url_for('history') }}">📜 Scan History</a>
-            <a href="{{ url_for('dashboard') }}">📊 Security Dashboard</a>
-            <a href="{{ url_for('export_csv') }}">⬇ Export Report</a>
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
+            <a href="{{ url_for('policy') }}">⚙ Policy</a>
+            <a href="{{ url_for('export_csv') }}">⬇ CSV</a>
+            <a href="{{ url_for('export_pdf') }}">🧾 PDF</a>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-    {% if result %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var finalBar = document.getElementById('finalStrengthBar');
-            if (finalBar) {
-                var score = finalBar.dataset.score;
-                var color = finalBar.dataset.color;
-                if (score) {
-                    finalBar.style.width = score + '%';
-                }
-                if (color) {
-                    finalBar.style.backgroundColor = color;
-                }
-                var scoreValue = document.getElementById('finalScoreValue');
-                var strengthValue = document.getElementById('finalStrengthValue');
-                if (scoreValue && color) {
-                    scoreValue.style.color = color;
-                }
-                if (strengthValue && color) {
-                    strengthValue.style.color = color;
-                }
-            }
-        });
-    </script>
-    {% endif %}
 </body>
 </html>
