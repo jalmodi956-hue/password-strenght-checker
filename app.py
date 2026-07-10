@@ -8,6 +8,8 @@ import csv
 import math
 import random
 import string
+import os
+
 from io import StringIO, BytesIO
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
@@ -815,7 +817,9 @@ def export_pdf():
 # --------------------------------
 # Main
 # --------------------------------
+
+init_db()
+create_default_user_if_needed()
+
 if __name__ == "__main__":
-    init_db()
-    create_default_user_if_needed()
     app.run(debug=True)
