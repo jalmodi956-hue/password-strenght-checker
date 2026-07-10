@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Checker Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Password Strength Checker</h1>
+        <p class="subtitle">Dashboard Overview of Password Scan Results</p>
+
+        <div class="dashboard-grid">
+            <div class="card total">
+                <h3>Total Scans</h3>
+                <p>{{ total_scans }}</p>
+            </div>
+
+            <div class="card weak">
+                <h3>Weak Passwords</h3>
+                <p>{{ weak_count }}</p>
+            </div>
+
+            <div class="card medium">
+                <h3>Medium Passwords</h3>
+                <p>{{ medium_count }}</p>
+            </div>
+
+            <div class="card strong">
+                <h3>Strong Passwords</h3>
+                <p>{{ strong_count }}</p>
+            </div>
+        </div>
+
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">🏠 Home</a>
+            <a href="{{ url_for('history') }}">📜 View History</a>
+            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
+        </div>
+    </div>
+
+</body>
+</html>
