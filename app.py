@@ -19,7 +19,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 app = Flask(__name__)
 app.secret_key = "change_this_secret_key_123"
-DB_NAME = "password_checker.db"
+if os.environ.get("VERCEL"):
+    DB_NAME = "/tmp/password_checker.db"
+else:
+    DB_NAME = "password_checker.db"
 
 COMMON_WEAK_PASSWORDS = {
     "123456", "123456789", "password", "admin", "qwerty",
@@ -524,15 +527,15 @@ def index():
 
         if password:
             result = check_password_strength(password, policy)
-            save_to_history(
-                user_id,
-                password,
-                result["score"],
-                result["strength"],
-                result["color"],
-                result["entropy"],
-                result["crack_time"]
-            )
+            # save_to_history(
+            #     user_id,
+            #     password,
+            #     result["score"],
+            #     result["strength"],
+            #     result["color"],
+            #     result["entropy"],
+            #     result["crack_time"]
+            # )
 
     return render_template(
         "index.html",
