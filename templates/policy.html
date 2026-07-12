@@ -1,73 +1,279 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Policy - Cyber Password Security Engine</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <title>Password Policy | Hexa Shield</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
+
 <body>
-    <div class="cyber-bg"></div>
 
-    <div class="container">
-        <h1 class="page-title">PASSWORD POLICY SETTINGS</h1>
-        <p class="page-subtitle">Customize your password security requirements.</p>
+<nav class="navbar">
+    <div class="container admin-header">
 
-        <div class="nav-links" style="margin-top:0; margin-bottom:20px;">
-            <a href="{{ url_for('index') }}">🏠 Home</a>
-            <a href="{{ url_for('history') }}">📜 History</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
-            <a href="{{ url_for('logout') }}">🚪 Logout</a>
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+            <i class="fa-solid fa-shield-halved"></i>
+            Hexa Shield
+        </a>
+
+        <div>
+            <a class="nav-link" href="{{ url_for('index') }}">Analyzer</a>
+            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a class="nav-link" href="{{ url_for('history') }}">History</a>
+            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-container">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <form method="POST" class="panel-box neon-box">
-            <h3>UPDATE POLICY</h3>
-
-            <div class="form-group">
-                <label for="min_length">Minimum Length</label>
-                <input type="number" name="min_length" id="min_length" min="4" max="64"
-                       value="{{ policy.min_length if policy else 8 }}" required>
-            </div>
-
-            <div class="checkbox-grid">
-                <label class="checkbox-item">
-                    <input type="checkbox" name="require_uppercase"
-                           {% if policy and policy.require_uppercase %}checked{% endif %}>
-                    Require Uppercase
-                </label>
-
-                <label class="checkbox-item">
-                    <input type="checkbox" name="require_lowercase"
-                           {% if policy and policy.require_lowercase %}checked{% endif %}>
-                    Require Lowercase
-                </label>
-
-                <label class="checkbox-item">
-                    <input type="checkbox" name="require_digit"
-                           {% if policy and policy.require_digit %}checked{% endif %}>
-                    Require Digit
-                </label>
-
-                <label class="checkbox-item">
-                    <input type="checkbox" name="require_special"
-                           {% if policy and policy.require_special %}checked{% endif %}>
-                    Require Special Character
-                </label>
-            </div>
-
-            <button type="submit" class="btn btn-primary mt-20">Save Policy</button>
-        </form>
     </div>
+</nav>
+
+
+<main class="container main-container">
+
+    <div class="hero">
+
+        <h1>Password Policy</h1>
+
+        <p>
+            Configure password security requirements for Hexa Shield.
+        </p>
+
+    </div>
+
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            {% for category, message in messages %}
+
+                <div class="alert
+                    {% if category == 'success' %}
+                        alert-success
+                    {% elif category == 'warning' %}
+                        alert-warning
+                    {% else %}
+                        alert-danger
+                    {% endif %}
+                ">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <div class="analyzer-card">
+
+        <h2 class="section-title">
+            <i class="fa-solid fa-shield"></i>
+            Security Requirements
+        </h2>
+
+
+        <form method="POST"
+              action="{{ url_for('policy') }}">
+
+
+            <label>
+                <i class="fa-solid fa-ruler"></i>
+                Minimum Password Length
+            </label>
+
+            <input type="number"
+                   name="min_length"
+                   min="6"
+                   max="64"
+                   value="{{ policy.min_length if policy else 8 }}"
+                   required>
+
+
+            <div class="requirements">
+
+
+                <label class="requirement">
+
+                    <input type="checkbox"
+                           name="require_uppercase"
+                           {% if not policy or policy.require_uppercase %}
+                           checked
+                           {% endif %}>
+
+                    <span>
+                        Require uppercase letter (A-Z)
+                    </span>
+
+                </label>
+
+
+                <label class="requirement">
+
+                    <input type="checkbox"
+                           name="require_lowercase"
+                           {% if not policy or policy.require_lowercase %}
+                           checked
+                           {% endif %}>
+
+                    <span>
+                        Require lowercase letter (a-z)
+                    </span>
+
+                </label>
+
+
+                <label class="requirement">
+
+                    <input type="checkbox"
+                           name="require_number"
+                           {% if not policy or policy.require_number %}
+                           checked
+                           {% endif %}>
+
+                    <span>
+                        Require number (0-9)
+                    </span>
+
+                </label>
+
+
+                <label class="requirement">
+
+                    <input type="checkbox"
+                           name="require_special"
+                           {% if not policy or policy.require_special %}
+                           checked
+                           {% endif %}>
+
+                    <span>
+                        Require special character (!@#$%)
+                    </span>
+
+                </label>
+
+
+            </div>
+
+
+            <button type="submit"
+                    class="btn btn-primary full-btn"
+                    style="margin-top:25px;">
+
+                <i class="fa-solid fa-floppy-disk"></i>
+
+                Save Password Policy
+
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <div class="result-card">
+
+        <h2>
+            <i class="fa-solid fa-circle-info"></i>
+            Current Policy
+        </h2>
+
+
+        <div class="result-grid">
+
+
+            <div class="result-item">
+
+                <h3>
+                    {{ policy.min_length if policy else 8 }}
+                </h3>
+
+                <p>Minimum Length</p>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <h3>
+                    {% if not policy or policy.require_uppercase %}
+                    Enabled
+                    {% else %}
+                    Disabled
+                    {% endif %}
+                </h3>
+
+                <p>Uppercase</p>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <h3>
+                    {% if not policy or policy.require_number %}
+                    Enabled
+                    {% else %}
+                    Disabled
+                    {% endif %}
+                </h3>
+
+                <p>Numbers</p>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <h3>
+                    {% if not policy or policy.require_special %}
+                    Enabled
+                    {% else %}
+                    Disabled
+                    {% endif %}
+                </h3>
+
+                <p>Special Characters</p>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</main>
+
+
+<footer>
+
+    <p>
+        <i class="fa-solid fa-shield-halved"></i>
+        Hexa Shield Password Security Platform
+    </p>
+
+</footer>
+
+
+<button class="theme-toggle"
+        id="themeToggle"
+        type="button">
+
+    <i class="fa-solid fa-moon"></i>
+
+</button>
+
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
 </body>
+
 </html>

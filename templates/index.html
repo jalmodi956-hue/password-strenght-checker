@@ -1,228 +1,484 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Password Security Engine</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <title>Password Analyzer | Hexa Shield</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
+
 <body>
-    <div class="cyber-bg"></div>
 
-    <div class="container">
-        <!-- Header -->
-        <div class="hero-section">
-            <h1 class="cyber-title">CYBER PASSWORD SECURITY ENGINE</h1>
-            <p class="subtitle">
-                Analyze password strength, entropy, estimated crack time, and security risk in real time.
-            </p>
-        </div>
+<!-- NAVBAR -->
 
-        <!-- Top Navigation -->
-        <div class="nav-links" style="margin-top: 0; margin-bottom: 20px;">
-            <a href="{{ url_for('history') }}">📜 Scan History</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('generate_password_route') }}">🔐 Password Generator</a>
-            <a href="{{ url_for('policy') }}">⚙ Policy Settings</a>
-            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
-            <a href="{{ url_for('export_pdf') }}">🧾 Export PDF</a>
-            <a href="{{ url_for('logout') }}">🚪 Logout</a>
-        </div>
+<nav class="navbar">
 
-        <!-- User Info -->
-        <div class="result-box neon-box">
-            <h3>USER SESSION</h3>
-            <div class="score-row">
-                <span class="score-label">Logged in as:</span>
-                <span class="score-value">{{ username }}</span>
-            </div>
-            {% if policy %}
-            <div class="score-row">
-                <span class="score-label">Current Minimum Length Policy:</span>
-                <span class="score-value">{{ policy.min_length }}</span>
-            </div>
+    <div class="container admin-header">
+
+        <a class="navbar-brand"
+           href="{{ url_for('index') }}">
+
+            <i class="fa-solid fa-shield-halved"></i>
+            Hexa Shield
+
+        </a>
+
+        <div>
+
+            <a class="nav-link"
+               href="{{ url_for('index') }}">
+                Analyzer
+            </a>
+
+            <a class="nav-link"
+               href="{{ url_for('dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="nav-link"
+               href="{{ url_for('history') }}">
+                History
+            </a>
+
+            <a class="nav-link"
+               href="{{ url_for('policy') }}">
+                Policy
+            </a>
+
+            {% if session.get('is_admin') %}
+
+            <a class="nav-link"
+               href="{{ url_for('admin') }}">
+                Admin
+            </a>
+
             {% endif %}
+
+            <a class="nav-link"
+               href="{{ url_for('logout') }}">
+                Logout
+            </a>
+
         </div>
 
-        <!-- Input Form -->
-        <form method="POST" class="cyber-form">
-            <div class="input-group">
-                <input
-                    type="password"
-                    name="password"
-                    id="password"
-                    placeholder="Enter your password for security analysis..."
-                    required
-                >
-                <button type="button" class="btn-secondary" id="togglePassword">Show</button>
-                <button type="button" class="btn-warning" id="copyPassword">Copy</button>
-                <button type="submit" class="btn-primary">Scan Password</button>
-            </div>
-        </form>
-
-        <!-- Live Preview Engine -->
-        <div class="result-box neon-box">
-            <h3>LIVE SECURITY ENGINE</h3>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-label">Security Score</span>
-                    <span class="stat-value" id="scoreText">0/100</span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Strength Level</span>
-                    <span class="stat-value strength-text" id="strengthText">Weak</span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Live Entropy</span>
-                    <span class="stat-value" id="liveEntropy">0</span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Live Crack Time</span>
-                    <span class="stat-value" id="liveCrackTime">Instantly</span>
-                </div>
-            </div>
-
-            <div class="progress-container">
-                <div class="progress-bar" id="strengthBar"></div>
-            </div>
-
-            <p class="scan-note">Live analysis updates as you type.</p>
-
-            <div class="result-box inner-box">
-                <h3>LIVE RECOMMENDATIONS</h3>
-                <ul class="feedback-list" id="liveFeedback">
-                    <li>Type a password to begin live analysis.</li>
-                </ul>
-            </div>
-        </div>
-
-        {% if result %}
-        <!-- Final Result -->
-        <div class="result-box neon-box final-result-box">
-            <h3>FINAL SECURITY ANALYSIS</h3>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-label">Password Score</span>
-                    <span class="stat-value {{ result.color_class }}">
-                        {{ result.score }}/100
-                    </span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Strength</span>
-                    <span class="stat-value strength-text" data-color="{{ result.color }}">
-                            {{ result.strength }}
-                    </span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Entropy</span>
-                    <span class="stat-value">{{ result.entropy }}</span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Estimated Crack Time</span>
-                    <span class="stat-value">{{ result.crack_time }}</span>
-                </div>
-            </div>
-
-            <div class="progress-container">
-                <div class="progress-bar"
-                     id="resultProgress"
-                    data-score="{{ result.score }}"
-                    data-color="{{ result.color }}">
-                </div>
-            </div>
-
-            {% if result.feedback %}
-                <div class="result-box inner-box">
-                    <h3>SECURITY RECOMMENDATIONS</h3>
-                    <ul class="feedback-list">
-                        {% for item in result.feedback %}
-                            <li>{{ item }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            {% else %}
-                <div class="result-box inner-box success-box">
-                    <h3>STATUS</h3>
-                    <p class="success-text">
-                        Excellent. Your password appears strong and has a good security profile.
-                    </p>
-                </div>
-            {% endif %}
-        </div>
-        {% endif %}
-
-        <!-- Current Policy -->
-        {% if policy %}
-        <div class="result-box neon-box">
-            <h3>CURRENT PASSWORD POLICY</h3>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-label">Minimum Length</span>
-                    <span class="stat-value">{{ policy.min_length }}</span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Uppercase Required</span>
-                    <span class="stat-value">
-                        {% if policy.require_uppercase %}Yes{% else %}No{% endif %}
-                    </span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Lowercase Required</span>
-                    <span class="stat-value">
-                        {% if policy.require_lowercase %}Yes{% else %}No{% endif %}
-                    </span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Digit Required</span>
-                    <span class="stat-value">
-                        {% if policy.require_digit %}Yes{% else %}No{% endif %}
-                    </span>
-                </div>
-
-                <div class="stat-card">
-                    <span class="stat-label">Special Character Required</span>
-                    <span class="stat-value">
-                        {% if policy.require_special %}Yes{% else %}No{% endif %}
-                    </span>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Security Tips -->
-        <div class="result-box neon-box">
-            <h3>SECURITY HARDENING TIPS</h3>
-            <ul class="feedback-list">
-                <li>Use at least 12–16 characters for stronger password security.</li>
-                <li>Mix uppercase, lowercase, numbers, and special symbols.</li>
-                <li>Avoid common passwords like <b>123456</b>, <b>password</b>, or <b>admin</b>.</li>
-                <li>Do not use predictable patterns like <b>abc123</b>, <b>qwerty</b>, or repeated characters.</li>
-                <li>Use a unique password for every account and consider a password manager.</li>
-            </ul>
-        </div>
-
-        <!-- Bottom Navigation -->
-        <div class="nav-links">
-            <a href="{{ url_for('history') }}">📜 Scan History</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
-            <a href="{{ url_for('policy') }}">⚙ Policy</a>
-            <a href="{{ url_for('export_csv') }}">⬇ CSV</a>
-            <a href="{{ url_for('export_pdf') }}">🧾 PDF</a>
-        </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</nav>
+
+
+<!-- MAIN -->
+
+<main class="container main-container">
+
+
+    <!-- HERO -->
+
+    <section class="hero">
+
+        <h1>
+            AI Password Analyzer
+        </h1>
+
+        <p>
+            Analyze password strength, security risk,
+            entropy and estimated crack resistance.
+        </p>
+
+    </section>
+
+
+    <!-- FLASH MESSAGE -->
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            {% for category, message in messages %}
+
+                <div class="alert
+                    {% if category == 'success' %}
+                        alert-success
+                    {% elif category == 'warning' %}
+                        alert-warning
+                    {% else %}
+                        alert-danger
+                    {% endif %}
+                ">
+
+                    {{ message }}
+
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <!-- PASSWORD ANALYZER -->
+
+    <section class="analyzer-card">
+
+        <h2 class="section-title">
+
+            <i class="fa-solid fa-magnifying-glass-chart"></i>
+
+            Password Security Scan
+
+        </h2>
+
+
+        <form method="POST"
+              action="{{ url_for('index') }}">
+
+            <label>
+
+                <i class="fa-solid fa-key"></i>
+
+                Enter Password
+
+            </label>
+
+
+            <div class="password-wrapper">
+
+                <input type="password"
+                       id="password"
+                       name="password"
+                       placeholder="Enter password to analyze"
+                       required
+                       autocomplete="off">
+
+
+                <span class="toggle-password"
+                      onclick="togglePassword('password', this)">
+
+                    <i class="fa-solid fa-eye"></i>
+
+                </span>
+
+            </div>
+
+
+            <!-- STRENGTH BAR -->
+
+            <div class="progress">
+
+                <div id="strengthBar"
+                     class="progress-bar">
+                </div>
+
+            </div>
+
+
+            <p id="strengthText"
+               class="strength-text">
+
+                Password Strength
+
+            </p>
+
+
+            <!-- REQUIREMENTS -->
+
+            <div class="requirements">
+
+
+                <div id="lengthRequirement"
+                     class="requirement invalid">
+
+                    <i class="fa-solid fa-circle-xmark"></i>
+
+                    Minimum 8 characters
+
+                </div>
+
+
+                <div id="uppercaseRequirement"
+                     class="requirement invalid">
+
+                    <i class="fa-solid fa-circle-xmark"></i>
+
+                    Uppercase letter
+
+                </div>
+
+
+                <div id="lowercaseRequirement"
+                     class="requirement invalid">
+
+                    <i class="fa-solid fa-circle-xmark"></i>
+
+                    Lowercase letter
+
+                </div>
+
+
+                <div id="numberRequirement"
+                     class="requirement invalid">
+
+                    <i class="fa-solid fa-circle-xmark"></i>
+
+                    Number
+
+                </div>
+
+
+                <div id="specialRequirement"
+                     class="requirement invalid">
+
+                    <i class="fa-solid fa-circle-xmark"></i>
+
+                    Special character
+
+                </div>
+
+            </div>
+
+
+            <button type="submit"
+                    class="btn btn-primary full-btn"
+                    style="margin-top:25px;">
+
+                <i class="fa-solid fa-shield-halved"></i>
+
+                Analyze Password
+
+            </button>
+
+        </form>
+
+
+        <!-- PASSWORD GENERATOR -->
+
+        <div style="margin-top:25px;">
+
+            <button type="button"
+                    class="btn btn-secondary full-btn"
+                    onclick="generatePassword()">
+
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+
+                Generate Secure Password
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- RESULT -->
+
+    {% if result %}
+
+    <section class="result-card">
+
+        <h2>
+
+            <i class="fa-solid fa-chart-line"></i>
+
+            Security Analysis
+
+        </h2>
+
+
+        <div class="result-grid">
+
+
+            <div class="result-item">
+
+                <h3>
+                    {{ result.score }}/5
+                </h3>
+
+                <p>
+                    Security Score
+                </p>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <h3 class="
+                    {% if result.strength == 'Weak' %}
+                        weak
+                    {% elif result.strength == 'Medium' %}
+                        medium
+                    {% elif result.strength == 'Strong' %}
+                        strong
+                    {% else %}
+                        very-strong
+                    {% endif %}
+                ">
+
+                    {{ result.strength }}
+
+                </h3>
+
+                <p>
+                    Password Strength
+                </p>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <h3>
+                    {{ result.entropy }}
+                </h3>
+
+                <p>
+                    Entropy Bits
+                </p>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <h3>
+                    {{ result.crack_time }}
+                </h3>
+
+                <p>
+                    Estimated Crack Time
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- BREACH STATUS -->
+
+        {% if result.breached is defined %}
+
+        <div class="alert
+            {% if result.breached %}
+                alert-danger
+            {% else %}
+                alert-success
+            {% endif %}
+        "
+        style="margin-top:25px;">
+
+            {% if result.breached %}
+
+                <i class="fa-solid fa-triangle-exclamation"></i>
+
+                Password may appear in known breach data.
+                Avoid reusing this password.
+
+            {% else %}
+
+                <i class="fa-solid fa-circle-check"></i>
+
+                No known breach match detected.
+
+            {% endif %}
+
+        </div>
+
+        {% endif %}
+
+
+        <!-- RECOMMENDATIONS -->
+
+        {% if result.recommendations %}
+
+        <div class="requirements">
+
+            <h3>
+
+                <i class="fa-solid fa-robot"></i>
+
+                AI Security Recommendations
+
+            </h3>
+
+
+            {% for recommendation in result.recommendations %}
+
+                <div class="requirement">
+
+                    <i class="fa-solid fa-shield"></i>
+
+                    {{ recommendation }}
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+        {% endif %}
+
+
+        <!-- REPORT -->
+
+        <div style="margin-top:25px;">
+
+            <a href="{{ url_for('export_pdf') }}"
+               class="btn btn-outline full-btn">
+
+                <i class="fa-solid fa-file-pdf"></i>
+
+                Export Security Report
+
+            </a>
+
+        </div>
+
+
+    </section>
+
+    {% endif %}
+
+
+</main>
+
+
+<!-- FOOTER -->
+
+<footer>
+
+    <p>
+
+        <i class="fa-solid fa-shield-halved"></i>
+
+        Hexa Shield Password Security Platform
+
+    </p>
+
+</footer>
+
+
+<!-- THEME BUTTON -->
+
+<button class="theme-toggle"
+        id="themeToggle"
+        type="button">
+
+    <i class="fa-solid fa-moon"></i>
+
+</button>
+
+
+<!-- JAVASCRIPT -->
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
 </body>
+
 </html>

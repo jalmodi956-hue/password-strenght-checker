@@ -1,90 +1,372 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scan History - Cyber Password Security Engine</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <title>Scan History | Hexa Shield</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
+
 <body>
-    <div class="cyber-bg"></div>
 
-    <div class="container">
-        <h1 class="page-title">SCAN HISTORY</h1>
-        <p class="page-subtitle">View your saved password scan records.</p>
+<!-- NAVBAR -->
 
-        <div class="nav-links" style="margin-top:0; margin-bottom:20px;">
-            <a href="{{ url_for('index') }}">🏠 Home</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('generate_password_route') }}">🔐 Generator</a>
-            <a href="{{ url_for('policy') }}">⚙ Policy</a>
-            <a href="{{ url_for('export_csv') }}">⬇ Export CSV</a>
-            <a href="{{ url_for('export_pdf') }}">🧾 Export PDF</a>
-            <a href="{{ url_for('logout') }}">🚪 Logout</a>
+<nav class="navbar">
+
+    <div class="container admin-header">
+
+        <a class="navbar-brand"
+           href="{{ url_for('index') }}">
+
+            <i class="fa-solid fa-shield-halved"></i>
+            Hexa Shield
+
+        </a>
+
+        <div>
+
+            <a class="nav-link"
+               href="{{ url_for('index') }}">
+                Analyzer
+            </a>
+
+            <a class="nav-link"
+               href="{{ url_for('dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="nav-link"
+               href="{{ url_for('history') }}">
+                History
+            </a>
+
+            <a class="nav-link"
+               href="{{ url_for('policy') }}">
+                Policy
+            </a>
+
+            {% if session.get('is_admin') %}
+
+            <a class="nav-link"
+               href="{{ url_for('admin') }}">
+                Admin
+            </a>
+
+            {% endif %}
+
+            <a class="nav-link"
+               href="{{ url_for('logout') }}">
+                Logout
+            </a>
+
         </div>
 
-        {% if records and records|length > 0 %}
-        <div class="panel-box neon-box">
-            <div class="score-row">
-                <h3 style="margin-bottom:0;">HISTORY RECORDS</h3>
-                <form method="POST" action="{{ url_for('clear_history') }}"
-                      onsubmit="return confirm('Are you sure you want to clear all history?');">
-                    <button type="submit" class="btn btn-danger">Clear All History</button>
-                </form>
-            </div>
-
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Password</th>
-                            <th>Score</th>
-                            <th>Strength</th>
-                            <th>Entropy</th>
-                            <th>Crack Time</th>
-                            <th>Scan Time</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in records %}
-                        <tr>
-                            <td>{{ row.id }}</td>
-                            <td>{{ row.password_text }}</td>
-                            <td>{{ row.score }}</td>
-                            <td>
-                                {% if row.strength == "Weak" %}
-                                    <span class="badge badge-weak">Weak</span>
-                                {% elif row.strength == "Medium" %}
-                                    <span class="badge badge-medium">Medium</span>
-                                {% else %}
-                                    <span class="badge badge-strong">Strong</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ row.entropy }}</td>
-                            <td>{{ row.crack_time }}</td>
-                            <td>{{ row.scan_time }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('delete_history', record_id=row.id) }}"
-                                      onsubmit="return confirm('Delete this record?');">
-                                    <button type="submit" class="btn btn-danger">Delete</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% else %}
-        <div class="panel-box neon-box center">
-            <h3>No History Found</h3>
-            <p style="color:#9fc8e2;">No password scans have been saved yet.</p>
-        </div>
-        {% endif %}
     </div>
-</body>
-</html>
 
+</nav>
+
+
+<!-- MAIN -->
+
+<main class="container main-container">
+
+
+    <!-- HERO -->
+
+    <section class="hero">
+
+        <h1>
+            Password Scan History
+        </h1>
+
+        <p>
+            Review your previous password security scans
+            and security analysis results.
+        </p>
+
+    </section>
+
+
+    <!-- FLASH MESSAGES -->
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            {% for category, message in messages %}
+
+                <div class="alert
+                    {% if category == 'success' %}
+                        alert-success
+                    {% elif category == 'warning' %}
+                        alert-warning
+                    {% else %}
+                        alert-danger
+                    {% endif %}
+                ">
+
+                    {{ message }}
+
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <!-- HISTORY TABLE -->
+
+    <section class="card">
+
+        <div class="admin-header">
+
+            <div>
+
+                <h2>
+
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+
+                    Security Scan Records
+
+                </h2>
+
+                <p style="color:var(--muted); margin-top:8px;">
+
+                    Total scans:
+                    {{ scans|length }}
+
+                </p>
+
+            </div>
+
+
+            {% if scans %}
+
+            <a href="{{ url_for('clear_history') }}"
+               class="btn btn-danger"
+               onclick="return confirm('Are you sure you want to clear scan history?');">
+
+                <i class="fa-solid fa-trash"></i>
+
+                Clear History
+
+            </a>
+
+            {% endif %}
+
+        </div>
+
+
+        {% if scans %}
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>#</th>
+
+                        <th>Password Length</th>
+
+                        <th>Score</th>
+
+                        <th>Strength</th>
+
+                        <th>Entropy</th>
+
+                        <th>Crack Time</th>
+
+                        <th>Scan Time</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {% for scan in scans %}
+
+                    <tr>
+
+                        <td>
+                            {{ scan.id }}
+                        </td>
+
+
+                        <td>
+
+                            <i class="fa-solid fa-key"></i>
+
+                            {{ scan.password_length }}
+
+                        </td>
+
+
+                        <td>
+
+                            {{ scan.score }}/5
+
+                        </td>
+
+
+                        <td>
+
+                            {% if scan.strength == 'Weak' %}
+
+                                <span class="badge badge-danger">
+                                    Weak
+                                </span>
+
+                            {% elif scan.strength == 'Medium' %}
+
+                                <span class="badge badge-warning">
+                                    Medium
+                                </span>
+
+                            {% elif scan.strength == 'Strong' %}
+
+                                <span class="badge badge-success">
+                                    Strong
+                                </span>
+
+                            {% else %}
+
+                                <span class="badge badge-success">
+                                    {{ scan.strength }}
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+
+                            {{ scan.entropy }}
+
+                        </td>
+
+
+                        <td>
+
+                            {{ scan.crack_time }}
+
+                        </td>
+
+
+                        <td>
+
+                            <i class="fa-solid fa-calendar"></i>
+
+                            {{ scan.scan_time }}
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        {% else %}
+
+
+        <!-- EMPTY HISTORY -->
+
+        <div style="text-align:center; padding:60px 20px;">
+
+            <i class="fa-solid fa-clock-rotate-left"
+               style="
+               font-size:60px;
+               color:var(--primary);
+               margin-bottom:20px;
+               ">
+            </i>
+
+
+            <h2>
+                No Scan History
+            </h2>
+
+
+            <p style="
+               color:var(--muted);
+               margin:15px 0 25px;
+               ">
+
+                You haven't analyzed any passwords yet.
+
+            </p>
+
+
+            <a href="{{ url_for('index') }}"
+               class="btn btn-primary">
+
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                Analyze Password
+
+            </a>
+
+        </div>
+
+
+        {% endif %}
+
+    </section>
+
+
+</main>
+
+
+<!-- FOOTER -->
+
+<footer>
+
+    <p>
+
+        <i class="fa-solid fa-shield-halved"></i>
+
+        Hexa Shield Password Security Platform
+
+    </p>
+
+</footer>
+
+
+<!-- THEME TOGGLE -->
+
+<button class="theme-toggle"
+        id="themeToggle"
+        type="button">
+
+    <i class="fa-solid fa-moon"></i>
+
+</button>
+
+
+<!-- JAVASCRIPT -->
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+
+</html>

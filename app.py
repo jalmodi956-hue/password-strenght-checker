@@ -1,85 +1,84 @@
-from flask import (
-    Flask, render_template, request, send_file,
-    redirect, url_for, session, flash
-)
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.exc import IntegrityError
-from werkzeug.security import generate_password_hash, check_password_hash
-
-import re
-import csv
-import math
-import secrets
-import string
 import os
-
-from io import StringIO, BytesIO
+import re
+import math
+import hashlib
 from datetime import datetime
+from functools import wraps
+from io import BytesIO
+
+import requests
+
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    send_file
+)
+
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
+
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash
+)
 
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer,
-    Table, TableStyle
-)
-from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer
+)
 
 
-# ==================================================
+# =========================================================
 # APP CONFIG
-# ==================================================
+# =========================================================
 
 app = Flask(__name__)
 
 app.secret_key = os.environ.get(
     "SECRET_KEY",
-    "change-this-secret-key"
+    "hexa-shield-secret-key"
 )
 
-DATABASE_URL = os.environ.get(
+database_url = os.environ.get(
     "DATABASE_URL",
     "sqlite:///password_checker.db"
 )
 
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace(
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace(
         "postgres://",
         "postgresql://",
         1
     )
 
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 280
-}
 
 db = SQLAlchemy(app)
 
 
-COMMON_WEAK_PASSWORDS = {
-    "123456",
-    "123456789",
-    "password",
-    "admin",
-    "qwerty",
-    "abc123",
-    "letmein",
-    "welcome",
-    "iloveyou",
-    "000000",
-    "password123",
-    "admin123",
-    "india123",
-    "test123"
-}
+# =========================================================
+# DATE TIME
+# =========================================================
+
+def current_time():
+
+    return datetime.now().strftime(
+        "%d-%m-%Y %I:%M:%S %p"
+    )
 
 
-# ==================================================
-# DATABASE MODELS
-# ==================================================
+# =========================================================
+# USER MODEL
+# =========================================================
 
 class User(db.Model):
 
@@ -91,21 +90,44 @@ class User(db.Model):
     )
 
     username = db.Column(
-        db.String(255),
+        db.String(100),
         unique=True,
-        nullable=False,
-        index=True
-    )
-
-    password = db.Column(
-        db.Text,
         nullable=False
     )
 
+    email = db.Column(
+        db.String(120),
+        unique=True,
+        nullable=True
+    )
 
-class PasswordHistory(db.Model):
+    password = db.Column(
+        db.String(255),
+        nullable=False
+    )
 
-    __tablename__ = "password_history"
+    role = db.Column(
+        db.String(20),
+        default="user"
+    )
+
+    theme = db.Column(
+        db.String(20),
+        default="dark"
+    )
+
+    created_at = db.Column(
+        db.String(50)
+    )
+
+
+# =========================================================
+# PASSWORD SCAN MODEL
+# =========================================================
+
+class PasswordScan(db.Model):
+
+    __tablename__ = "scans"
 
     id = db.Column(
         db.Integer,
@@ -113,30 +135,21 @@ class PasswordHistory(db.Model):
     )
 
     user_id = db.Column(
-        db.Integer,
-        db.ForeignKey("users.id"),
-        nullable=False,
-        index=True
+        db.Integer
     )
 
-    password_text = db.Column(
-        db.Text,
-        nullable=False
+    password_length = db.Column(
+        db.Integer,
+        default=0
     )
 
     score = db.Column(
         db.Integer,
-        nullable=False
+        default=0
     )
 
     strength = db.Column(
-        db.String(50),
-        nullable=False
-    )
-
-    color = db.Column(
-        db.String(50),
-        nullable=False
+        db.String(50)
     )
 
     entropy = db.Column(
@@ -145,24 +158,36 @@ class PasswordHistory(db.Model):
     )
 
     crack_time = db.Column(
-        db.Text,
-        default="Instantly"
+        db.String(100)
+    )
+
+    breached = db.Column(
+        db.Boolean,
+        default=False
     )
 
     scan_time = db.Column(
-        db.String(100),
-        nullable=False
+        db.String(50)
     )
 
+
+# =========================================================
+# PASSWORD POLICY MODEL
+# =========================================================
 
 class PasswordPolicy(db.Model):
 
     __tablename__ = "password_policy"
 
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
     user_id = db.Column(
         db.Integer,
-        db.ForeignKey("users.id"),
-        primary_key=True
+        unique=True,
+        nullable=False
     )
 
     min_length = db.Column(
@@ -171,477 +196,489 @@ class PasswordPolicy(db.Model):
     )
 
     require_uppercase = db.Column(
-        db.Integer,
-        default=1
+        db.Boolean,
+        default=True
     )
 
     require_lowercase = db.Column(
-        db.Integer,
-        default=1
+        db.Boolean,
+        default=True
     )
 
-    require_digit = db.Column(
-        db.Integer,
-        default=1
+    require_number = db.Column(
+        db.Boolean,
+        default=True
     )
 
     require_special = db.Column(
-        db.Integer,
-        default=1
+        db.Boolean,
+        default=True
     )
 
 
-# ==================================================
-# DATABASE SETUP
-# ==================================================
+# =========================================================
+# DATABASE MIGRATION
+# =========================================================
 
-def init_db():
+def get_columns(table_name):
 
-    db.create_all()
+    result = db.session.execute(
+        text(
+            f"PRAGMA table_info({table_name})"
+        )
+    ).fetchall()
+
+    return [
+        column[1]
+        for column in result
+    ]
 
 
-def create_default_user_if_needed():
+def add_column(
+    table_name,
+    column_name,
+    column_type
+):
 
-    user = User.query.filter_by(
-        username="admin"
-    ).first()
+    columns = get_columns(table_name)
 
-    if not user:
+    if column_name not in columns:
 
-        user = User(
-            username="admin",
-            password=generate_password_hash(
-                "admin123"
+        db.session.execute(
+            text(
+                f"ALTER TABLE {table_name} "
+                f"ADD COLUMN {column_name} "
+                f"{column_type}"
             )
         )
 
-        db.session.add(user)
-
-        db.session.flush()
-
-        policy = PasswordPolicy(
-            user_id=user.id
-        )
-
-        db.session.add(policy)
-
         db.session.commit()
 
-
-# ==================================================
-# SESSION HELPERS
-# ==================================================
-
-def is_logged_in():
-
-    return "user_id" in session
+        print(
+            f"{table_name}.{column_name} added"
+        )
 
 
-def get_current_user_id():
+def update_database():
 
-    return session.get("user_id")
+    with app.app_context():
+
+        try:
+
+            db.create_all()
+
+            if not database_url.startswith("sqlite"):
+
+                print("DATABASE TABLES READY")
+
+                return
 
 
-# ==================================================
-# PASSWORD VERIFY
-# ==================================================
+            # USERS
 
-def verify_password(
-    stored_password,
-    entered_password
-):
+            add_column(
+                "users",
+                "email",
+                "VARCHAR(120)"
+            )
 
-    if stored_password.startswith(
-        ("scrypt:", "pbkdf2:")
+            add_column(
+                "users",
+                "role",
+                "VARCHAR(20) DEFAULT 'user'"
+            )
+
+            add_column(
+                "users",
+                "theme",
+                "VARCHAR(20) DEFAULT 'dark'"
+            )
+
+            add_column(
+                "users",
+                "created_at",
+                "VARCHAR(50)"
+            )
+
+
+            # SCANS
+
+            add_column(
+                "scans",
+                "user_id",
+                "INTEGER"
+            )
+
+            add_column(
+                "scans",
+                "password_length",
+                "INTEGER DEFAULT 0"
+            )
+
+            add_column(
+                "scans",
+                "score",
+                "INTEGER DEFAULT 0"
+            )
+
+            add_column(
+                "scans",
+                "strength",
+                "VARCHAR(50)"
+            )
+
+            add_column(
+                "scans",
+                "entropy",
+                "FLOAT DEFAULT 0"
+            )
+
+            add_column(
+                "scans",
+                "crack_time",
+                "VARCHAR(100)"
+            )
+
+            add_column(
+                "scans",
+                "breached",
+                "BOOLEAN DEFAULT 0"
+            )
+
+            add_column(
+                "scans",
+                "scan_time",
+                "VARCHAR(50)"
+            )
+
+
+            # PASSWORD POLICY
+
+            add_column(
+                "password_policy",
+                "user_id",
+                "INTEGER"
+            )
+
+            add_column(
+                "password_policy",
+                "min_length",
+                "INTEGER DEFAULT 8"
+            )
+
+            add_column(
+                "password_policy",
+                "require_uppercase",
+                "BOOLEAN DEFAULT 1"
+            )
+
+            add_column(
+                "password_policy",
+                "require_lowercase",
+                "BOOLEAN DEFAULT 1"
+            )
+
+            add_column(
+                "password_policy",
+                "require_number",
+                "BOOLEAN DEFAULT 1"
+            )
+
+            add_column(
+                "password_policy",
+                "require_special",
+                "BOOLEAN DEFAULT 1"
+            )
+
+            db.session.commit()
+
+            print(
+                "DATABASE MIGRATION SUCCESSFUL"
+            )
+
+        except Exception as error:
+
+            db.session.rollback()
+
+            print(
+                "DATABASE MIGRATION ERROR:",
+                repr(error)
+            )
+
+
+# =========================================================
+# LOGIN REQUIRED
+# =========================================================
+
+def login_required(function):
+
+    @wraps(function)
+    def decorated_function(
+        *args,
+        **kwargs
     ):
 
-        return check_password_hash(
-            stored_password,
-            entered_password
+        if "user_id" not in session:
+
+            flash(
+                "Please login first.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("login")
+            )
+
+        return function(
+            *args,
+            **kwargs
         )
 
-    return secrets.compare_digest(
-        stored_password,
-        entered_password
-    )
+    return decorated_function
 
 
-# ==================================================
-# POLICY HELPERS
-# ==================================================
+# =========================================================
+# ADMIN REQUIRED
+# =========================================================
 
-def get_user_policy(user_id):
+def admin_required(function):
 
-    policy = db.session.get(
-        PasswordPolicy,
-        user_id
-    )
+    @wraps(function)
+    def decorated_function(
+        *args,
+        **kwargs
+    ):
 
-    if not policy:
-
-        policy = PasswordPolicy(
-            user_id=user_id
-        )
-
-        db.session.add(policy)
-
-        db.session.commit()
-
-    return policy
-
-
-def update_user_policy(
-    user_id,
-    min_length,
-    require_uppercase,
-    require_lowercase,
-    require_digit,
-    require_special
-):
-
-    policy = get_user_policy(user_id)
-
-    policy.min_length = min_length
-
-    policy.require_uppercase = (
-        require_uppercase
-    )
-
-    policy.require_lowercase = (
-        require_lowercase
-    )
-
-    policy.require_digit = require_digit
-
-    policy.require_special = (
-        require_special
-    )
-
-    db.session.commit()
-
-
-# ==================================================
-# PASSWORD HELPERS
-# ==================================================
-
-def mask_password(password):
-
-    if not password:
-
-        return ""
-
-    if len(password) <= 2:
-
-        return "*" * len(password)
-
-    return (
-        password[0]
-        + "*" * (len(password) - 2)
-        + password[-1]
-    )
-
-
-def has_repeated_chars(password):
-
-    return re.search(
-        r"(.)\1{2,}",
-        password
-    ) is not None
-
-
-def has_sequence(password):
-
-    password_lower = password.lower()
-
-    sequences = [
-        "0123456789",
-        "1234567890",
-        "abcdefghijklmnopqrstuvwxyz",
-        "qwertyuiop",
-        "asdfghjkl",
-        "zxcvbnm"
-    ]
-
-    for seq in sequences:
-
-        for i in range(
-            len(seq) - 2
+        if not session.get(
+            "is_admin"
         ):
 
-            part = seq[i:i + 3]
+            flash(
+                "Admin access required.",
+                "danger"
+            )
 
-            if part in password_lower:
+            return redirect(
+                url_for("index")
+            )
 
-                return True
+        return function(
+            *args,
+            **kwargs
+        )
 
-    return False
-
-
-def has_keyboard_pattern(password):
-
-    password_lower = password.lower()
-
-    patterns = [
-        "qwerty",
-        "asdf",
-        "zxcv",
-        "qaz",
-        "wsx",
-        "edc"
-    ]
-
-    return any(
-        pattern in password_lower
-        for pattern in patterns
-    )
+    return decorated_function
 
 
-def calculate_charset_size(password):
+# =========================================================
+# ENTROPY
+# =========================================================
 
-    charset = 0
+def calculate_entropy(password):
+
+    pool_size = 0
 
     if re.search(
         r"[a-z]",
         password
     ):
 
-        charset += 26
+        pool_size += 26
+
 
     if re.search(
         r"[A-Z]",
         password
     ):
 
-        charset += 26
+        pool_size += 26
+
 
     if re.search(
         r"[0-9]",
         password
     ):
 
-        charset += 10
+        pool_size += 10
+
 
     if re.search(
         r"[^A-Za-z0-9]",
         password
     ):
 
-        charset += 32
-
-    return charset
+        pool_size += 32
 
 
-def calculate_entropy(password):
-
-    charset = calculate_charset_size(
-        password
-    )
-
-    if not password or charset == 0:
+    if pool_size == 0:
 
         return 0
 
-    return round(
+
+    entropy = (
+
         len(password)
-        * math.log2(charset),
+
+        * math.log2(pool_size)
+
+    )
+
+
+    return round(
+        entropy,
         2
     )
 
 
-def estimate_crack_time(entropy):
+# =========================================================
+# CRACK TIME
+# =========================================================
 
-    if entropy <= 0:
+def calculate_crack_time(entropy):
 
-        return "Instantly"
-
-    guesses = 2 ** entropy
-
-    guesses_per_second = 1_000_000_000
+    guesses_per_second = (
+        10_000_000_000
+    )
 
     seconds = (
-        guesses / guesses_per_second
-    )
+
+        2 ** entropy
+
+    ) / guesses_per_second
+
 
     if seconds < 1:
 
-        return "Less than 1 second"
+        return "Instantly"
+
 
     if seconds < 60:
 
-        return f"{int(seconds)} seconds"
+        return (
+            f"{int(seconds)} seconds"
+        )
+
 
     if seconds < 3600:
 
         return (
-            f"{int(seconds // 60)} minutes"
+            f"{int(seconds / 60)} minutes"
         )
+
 
     if seconds < 86400:
 
         return (
-            f"{int(seconds // 3600)} hours"
+            f"{int(seconds / 3600)} hours"
         )
 
-    if seconds < 2592000:
-
-        return (
-            f"{int(seconds // 86400)} days"
-        )
 
     if seconds < 31536000:
 
         return (
-            f"{int(seconds // 2592000)} months"
+            f"{int(seconds / 86400)} days"
         )
 
-    if seconds < 3153600000:
 
-        return (
-            f"{int(seconds // 31536000)} years"
-        )
-
-    return "Many years"
-
-
-# ==================================================
-# PASSWORD GENERATOR
-# ==================================================
-
-def generate_password(
-    length=14,
-    use_upper=True,
-    use_lower=True,
-    use_digits=True,
-    use_special=True
-):
-
-    length = max(
-        8,
-        min(int(length), 128)
-    )
-
-    groups = []
-
-    if use_upper:
-
-        groups.append(
-            string.ascii_uppercase
-        )
-
-    if use_lower:
-
-        groups.append(
-            string.ascii_lowercase
-        )
-
-    if use_digits:
-
-        groups.append(
-            string.digits
-        )
-
-    if use_special:
-
-        groups.append(
-            "!@#$%^&*()_+-=[]{}|;:,.<>?/"
-        )
-
-    if not groups:
-
-        groups = [
-            string.ascii_letters,
-            string.digits
-        ]
-
-    password_chars = [
-        secrets.choice(group)
-        for group in groups
-    ]
-
-    all_chars = "".join(groups)
-
-    while len(password_chars) < length:
-
-        password_chars.append(
-            secrets.choice(all_chars)
-        )
-
-    secrets.SystemRandom().shuffle(
-        password_chars
-    )
-
-    return "".join(
-        password_chars[:length]
+    years = (
+        seconds / 31536000
     )
 
 
-# ==================================================
-# PASSWORD STRENGTH CHECK
-# ==================================================
+    if years > 1_000_000_000:
 
-def check_password_strength(
-    password,
-    policy
-):
+        return "Billions of years"
+
+
+    if years > 1_000_000:
+
+        return "Millions of years"
+
+
+    if years > 1000:
+
+        return "Thousands of years"
+
+
+    return (
+        f"{int(years)} years"
+    )
+
+
+# =========================================================
+# BREACH API
+# =========================================================
+
+def check_password_breach(password):
+
+    try:
+
+        password_hash = hashlib.sha1(
+            password.encode(
+                "utf-8"
+            )
+        ).hexdigest().upper()
+
+
+        prefix = password_hash[:5]
+
+        suffix = password_hash[5:]
+
+
+        response = requests.get(
+
+            "https://api.pwnedpasswords.com/range/"
+            + prefix,
+
+            timeout=5
+
+        )
+
+
+        if response.status_code != 200:
+
+            return False
+
+
+        for line in response.text.splitlines():
+
+            hash_suffix = (
+                line.split(":")[0]
+            )
+
+
+            if hash_suffix == suffix:
+
+                return True
+
+
+        return False
+
+
+    except requests.RequestException:
+
+        return False
+
+
+# =========================================================
+# PASSWORD ANALYZER
+# =========================================================
+
+def analyze_password(password):
 
     score = 0
 
-    feedback = []
-
-    min_length = policy.min_length
-
-    require_uppercase = (
-        policy.require_uppercase
-    )
-
-    require_lowercase = (
-        policy.require_lowercase
-    )
-
-    require_digit = (
-        policy.require_digit
-    )
-
-    require_special = (
-        policy.require_special
-    )
-
-    if not password:
-
-        return {
-            "score": 0,
-            "strength": "Weak",
-            "color": "red",
-            "feedback": [
-                "Please enter a password"
-            ],
-            "entropy": 0,
-            "crack_time": "Instantly"
-        }
+    recommendations = []
 
 
-    if len(password) >= max(
-        min_length,
-        16
-    ):
+    if len(password) >= 8:
 
-        score += 30
-
-    elif len(password) >= max(
-        min_length,
-        12
-    ):
-
-        score += 25
-
-    elif len(password) >= min_length:
-
-        score += 18
+        score += 1
 
     else:
 
-        feedback.append(
-            f"Use at least {min_length} characters"
+        recommendations.append(
+            "Use at least 8 characters."
         )
 
 
@@ -650,12 +687,12 @@ def check_password_strength(
         password
     ):
 
-        score += 12
+        score += 1
 
-    elif require_uppercase:
+    else:
 
-        feedback.append(
-            "Add at least one uppercase letter"
+        recommendations.append(
+            "Add an uppercase letter."
         )
 
 
@@ -664,12 +701,12 @@ def check_password_strength(
         password
     ):
 
-        score += 12
+        score += 1
 
-    elif require_lowercase:
+    else:
 
-        feedback.append(
-            "Add at least one lowercase letter"
+        recommendations.append(
+            "Add a lowercase letter."
         )
 
 
@@ -678,190 +715,175 @@ def check_password_strength(
         password
     ):
 
-        score += 12
+        score += 1
 
-    elif require_digit:
+    else:
 
-        feedback.append(
-            "Add at least one number"
+        recommendations.append(
+            "Add a number."
         )
 
 
     if re.search(
-        r"[!@#$%^&*(),.?\":{}|<>_\-+=/\\[\];'`~]",
+        r"[^A-Za-z0-9]",
         password
     ):
 
-        score += 16
+        score += 1
 
-    elif require_special:
+    else:
 
-        feedback.append(
-            "Add at least one special character"
+        recommendations.append(
+            "Add a special character."
         )
 
 
-    if len(
-        re.findall(
-            r"[^A-Za-z0-9]",
-            password
-        )
-    ) >= 2:
+    if score <= 2:
 
-        score += 6
+        strength = "Weak"
 
+    elif score == 3:
 
-    if len(set(password)) >= 8:
+        strength = "Medium"
 
-        score += 5
+    elif score == 4:
 
+        strength = "Strong"
 
-    if password.lower() in COMMON_WEAK_PASSWORDS:
+    else:
 
-        score -= 35
-
-        feedback.append(
-            "This is a very common password. Avoid common passwords."
-        )
-
-
-    if has_repeated_chars(password):
-
-        score -= 10
-
-        feedback.append(
-            "Avoid repeated characters like aaa or 111"
-        )
-
-
-    if has_sequence(password):
-
-        score -= 10
-
-        feedback.append(
-            "Avoid easy sequences like 123, abc, qwe"
-        )
-
-
-    if has_keyboard_pattern(password):
-
-        score -= 8
-
-        feedback.append(
-            "Avoid keyboard patterns like qwerty or asdf"
-        )
+        strength = "Very Strong"
 
 
     entropy = calculate_entropy(
         password
     )
 
-    crack_time = estimate_crack_time(
+
+    crack_time = calculate_crack_time(
         entropy
     )
 
 
-    if entropy < 40:
-
-        feedback.append(
-            "Password entropy is low. Make it longer and more random."
-        )
-
-    elif entropy >= 60 and score >= 75:
-
-        feedback.append(
-            "Good entropy level. This password is relatively strong."
-        )
-
-
-    score = max(
-        0,
-        min(score, 100)
+    breached = check_password_breach(
+        password
     )
 
 
-    if score <= 40:
+    if breached:
 
-        strength = "Weak"
+        recommendations.insert(
+            0,
+            "Password appears in known breach data. Do not reuse it."
+        )
 
-        color = "red"
 
-    elif score <= 75:
+    if len(password) < 12:
 
-        strength = "Medium"
+        recommendations.append(
+            "For better security use 12-16 characters."
+        )
 
-        color = "orange"
 
-    else:
+    if not recommendations:
 
-        strength = "Strong"
-
-        color = "green"
+        recommendations.append(
+            "Password security looks strong. Keep it unique."
+        )
 
 
     return {
+
         "score": score,
+
         "strength": strength,
-        "color": color,
-        "feedback": feedback,
+
         "entropy": entropy,
-        "crack_time": crack_time
+
+        "crack_time": crack_time,
+
+        "breached": breached,
+
+        "recommendations": recommendations
+
     }
 
 
-# ==================================================
-# SAVE HISTORY
-# ==================================================
-
-def save_to_history(
-    user_id,
-    password,
-    score,
-    strength,
-    color,
-    entropy,
-    crack_time
-):
-
-    record = PasswordHistory(
-
-        user_id=user_id,
-
-        password_text=mask_password(
-            password
-        ),
-
-        score=score,
-
-        strength=strength,
-
-        color=color,
-
-        entropy=entropy,
-
-        crack_time=crack_time,
-
-        scan_time=datetime.now().strftime(
-            "%d-%m-%Y %I:%M:%S %p"
-        )
-    )
-
-    db.session.add(record)
-
-    db.session.commit()
-
-
-# ==================================================
+# =========================================================
 # LOGIN
-# ==================================================
+# =========================================================
 
-@app.route(
-    "/login",
-    methods=["GET", "POST"]
-)
+@app.route("/login", methods=["GET", "POST"])
 def login():
 
-    if is_logged_in():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+
+        email = request.form.get(
+            "email", ""
+        ).strip().lower()
+
+        password = request.form.get(
+            "password", ""
+        )
+
+        user = User.query.filter(
+            db.func.lower(User.email) == email
+        ).first()
+
+        if user is None:
+            flash(
+                "Email account not found.",
+                "danger"
+            )
+            return render_template("login.html")
+
+        if not check_password_hash(
+            user.password,
+            password
+        ):
+            flash(
+                "Incorrect password.",
+                "danger"
+            )
+            return render_template("login.html")
+
+        session.clear()
+
+        session["user_id"] = user.id
+        session["username"] = user.username
+        session["is_admin"] = (
+            user.role == "admin"
+        )
+        session["theme"] = (
+            user.theme or "dark"
+        )
+
+        flash(
+            "Login successful.",
+            "success"
+        )
+
+        return redirect(url_for("index"))
+
+    return render_template("login.html")
+
+# =========================================================
+# REGISTER
+# =========================================================
+
+@app.route(
+    "/register",
+    methods=[
+        "GET",
+        "POST"
+    ]
+)
+def register():
+
+    if "user_id" in session:
 
         return redirect(
             url_for("index")
@@ -875,92 +897,33 @@ def login():
             ""
         ).strip()
 
+
+        email = request.form.get(
+            "email",
+            ""
+        ).strip().lower()
+
+
         password = request.form.get(
             "password",
             ""
         )
 
 
-        user = User.query.filter_by(
-            username=username
-        ).first()
+        confirm_password = request.form.get(
+            "confirm_password",
+            ""
+        )
 
 
-        if user and verify_password(
-            user.password,
-            password
+        if (
+            not username
+            or not email
+            or not password
         ):
 
-            if not user.password.startswith(
-                ("scrypt:", "pbkdf2:")
-            ):
-
-                user.password = (
-                    generate_password_hash(
-                        password
-                    )
-                )
-
-                db.session.commit()
-
-
-            session.clear()
-
-            session["user_id"] = user.id
-
-            session["username"] = (
-                user.username
-            )
-
-
             flash(
-                "Login successful!",
-                "success"
-            )
-
-            return redirect(
-                url_for("index")
-            )
-
-
-        flash(
-            "Invalid username or password.",
-            "danger"
-        )
-
-
-    return render_template(
-        "login.html"
-    )
-
-
-# ==================================================
-# REGISTER
-# ==================================================
-
-@app.route(
-    "/register",
-    methods=["GET", "POST"]
-)
-def register():
-
-    if request.method == "POST":
-
-        username = request.form.get(
-            "username",
-            ""
-        ).strip()
-
-        password = request.form.get(
-            "password",
-            ""
-        )
-
-
-        if not username or not password:
-
-            flash(
-                "Username and password are required.",
+                "All fields are required.",
                 "danger"
             )
 
@@ -969,10 +932,10 @@ def register():
             )
 
 
-        if len(username) > 255:
+        if password != confirm_password:
 
             flash(
-                "Username is too long.",
+                "Passwords do not match.",
                 "danger"
             )
 
@@ -981,29 +944,91 @@ def register():
             )
 
 
-        user = User(
+        if len(password) < 8:
 
-            username=username,
-
-            password=generate_password_hash(
-                password
+            flash(
+                "Password must contain at least 8 characters.",
+                "warning"
             )
-        )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if User.query.filter_by(
+            username=username
+        ).first():
+
+            flash(
+                "Username already exists.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if User.query.filter_by(
+            email=email
+        ).first():
+
+            flash(
+                "Email already registered.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("register")
+            )
 
 
         try:
+
+            user = User(
+
+                username=username,
+
+                email=email,
+
+                password=generate_password_hash(
+                    password
+                ),
+
+                role="user",
+
+                theme="dark",
+
+                created_at=current_time()
+
+            )
+
 
             db.session.add(user)
 
             db.session.flush()
 
 
+            user_policy = PasswordPolicy(
+
+                user_id=user.id,
+
+                min_length=8,
+
+                require_uppercase=True,
+
+                require_lowercase=True,
+
+                require_number=True,
+
+                require_special=True
+
+            )
+
+
             db.session.add(
-
-                PasswordPolicy(
-                    user_id=user.id
-                )
-
+                user_policy
             )
 
 
@@ -1011,7 +1036,7 @@ def register():
 
 
             flash(
-                "Registration successful. Please login.",
+                "Account created successfully. Please login.",
                 "success"
             )
 
@@ -1021,12 +1046,19 @@ def register():
             )
 
 
-        except IntegrityError:
+        except Exception as error:
 
             db.session.rollback()
 
+
+            print(
+                "REGISTER ERROR:",
+                repr(error)
+            )
+
+
             flash(
-                "Username already exists.",
+                "Unable to create account. Check terminal error.",
                 "danger"
             )
 
@@ -1036,49 +1068,21 @@ def register():
     )
 
 
-# ==================================================
-# LOGOUT
-# ==================================================
-
-@app.route("/logout")
-def logout():
-
-    session.clear()
-
-    flash(
-        "Logged out successfully.",
-        "success"
-    )
-
-    return redirect(
-        url_for("login")
-    )
-
-
-# ==================================================
-# HOME
-# ==================================================
+# =========================================================
+# ANALYZER
+# =========================================================
 
 @app.route(
     "/",
-    methods=["GET", "POST"]
+    methods=[
+        "GET",
+        "POST"
+    ]
 )
+@login_required
 def index():
 
-    if not is_logged_in():
-
-        return redirect(
-            url_for("login")
-        )
-
-
     result = None
-
-    user_id = get_current_user_id()
-
-    policy = get_user_policy(
-        user_id
-    )
 
 
     if request.method == "POST":
@@ -1089,72 +1093,99 @@ def index():
         )
 
 
-        if password:
+        if not password:
 
-            result = check_password_strength(
-                password,
-                policy
+            flash(
+                "Please enter a password.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("index")
             )
 
 
-            save_to_history(
+        result = analyze_password(
+            password
+        )
 
-                user_id,
 
-                password,
+        scan = PasswordScan(
 
-                result["score"],
+            user_id=session["user_id"],
 
-                result["strength"],
+            password_length=len(
+                password
+            ),
 
-                result["color"],
+            score=result["score"],
 
-                result["entropy"],
+            strength=result["strength"],
 
-                result["crack_time"]
+            entropy=result["entropy"],
 
-            )
+            crack_time=result["crack_time"],
+
+            breached=result["breached"],
+
+            scan_time=current_time()
+
+        )
+
+
+        db.session.add(
+            scan
+        )
+
+
+        db.session.commit()
+
+
+        session["last_result"] = (
+            result
+        )
 
 
     return render_template(
 
         "index.html",
 
-        result=result,
-
-        policy=policy,
-
-        username=session.get(
-            "username"
-        )
+        result=result
 
     )
 
 
-# ==================================================
+# =========================================================
+# GENERATOR
+# =========================================================
+
+@app.route("/generator")
+@login_required
+def generator():
+
+    return render_template(
+        "generator.html"
+    )
+
+
+# =========================================================
 # HISTORY
-# ==================================================
+# =========================================================
 
 @app.route("/history")
+@login_required
 def history():
 
-    if not is_logged_in():
+    scans = (
 
-        return redirect(
-            url_for("login")
-        )
-
-
-    records = (
-
-        PasswordHistory.query
+        PasswordScan.query
 
         .filter_by(
-            user_id=get_current_user_id()
+            user_id=session["user_id"]
         )
 
         .order_by(
-            PasswordHistory.id.desc()
+            PasswordScan.id.desc()
         )
 
         .all()
@@ -1166,69 +1197,22 @@ def history():
 
         "history.html",
 
-        records=records
+        scans=scans
 
     )
 
 
-# ==================================================
-# DELETE HISTORY
-# ==================================================
-
-@app.route(
-    "/delete_history/<int:record_id>",
-    methods=["POST"]
-)
-def delete_history(record_id):
-
-    if not is_logged_in():
-
-        return redirect(
-            url_for("login")
-        )
-
-
-    record = PasswordHistory.query.filter_by(
-
-        id=record_id,
-
-        user_id=get_current_user_id()
-
-    ).first()
-
-
-    if record:
-
-        db.session.delete(record)
-
-        db.session.commit()
-
-
-    return redirect(
-        url_for("history")
-    )
-
-
-# ==================================================
+# =========================================================
 # CLEAR HISTORY
-# ==================================================
+# =========================================================
 
-@app.route(
-    "/clear_history",
-    methods=["POST"]
-)
+@app.route("/clear-history")
+@login_required
 def clear_history():
 
-    if not is_logged_in():
+    PasswordScan.query.filter_by(
 
-        return redirect(
-            url_for("login")
-        )
-
-
-    PasswordHistory.query.filter_by(
-
-        user_id=get_current_user_id()
+        user_id=session["user_id"]
 
     ).delete()
 
@@ -1236,66 +1220,146 @@ def clear_history():
     db.session.commit()
 
 
+    flash(
+        "Scan history cleared.",
+        "success"
+    )
+
+
     return redirect(
         url_for("history")
     )
 
 
-# ==================================================
+# =========================================================
 # DASHBOARD
-# ==================================================
+# =========================================================
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
 
-    if not is_logged_in():
+    scans = PasswordScan.query.filter_by(
 
-        return redirect(
-            url_for("login")
+        user_id=session["user_id"]
+
+    ).all()
+
+
+    total_scans = len(
+        scans
+    )
+
+
+    if total_scans:
+
+        average_score = round(
+
+            sum(
+                scan.score or 0
+                for scan in scans
+            )
+
+            / total_scans,
+
+            2
+
         )
 
+    else:
 
-    user_id = get_current_user_id()
-
-
-    total_scans = PasswordHistory.query.filter_by(
-        user_id=user_id
-    ).count()
+        average_score = 0
 
 
-    weak_count = PasswordHistory.query.filter_by(
-        user_id=user_id,
-        strength="Weak"
-    ).count()
+    weak_count = sum(
+
+        scan.strength == "Weak"
+
+        for scan in scans
+
+    )
 
 
-    medium_count = PasswordHistory.query.filter_by(
-        user_id=user_id,
-        strength="Medium"
-    ).count()
+    medium_count = sum(
+
+        scan.strength == "Medium"
+
+        for scan in scans
+
+    )
 
 
-    strong_count = PasswordHistory.query.filter_by(
-        user_id=user_id,
-        strength="Strong"
-    ).count()
+    strong_count = sum(
+
+        scan.strength == "Strong"
+
+        for scan in scans
+
+    )
 
 
-    recent_scans = (
+    very_strong_count = sum(
 
-        PasswordHistory.query
+        scan.strength == "Very Strong"
+
+        for scan in scans
+
+    )
+
+
+    strong_passwords = (
+
+        strong_count
+
+        + very_strong_count
+
+    )
+
+
+    if total_scans:
+
+        strong_percentage = round(
+
+            (
+                strong_passwords
+                / total_scans
+            )
+
+            * 100,
+
+            2
+
+        )
+
+    else:
+
+        strong_percentage = 0
+
+
+    last_scan = (
+
+        PasswordScan.query
 
         .filter_by(
-            user_id=user_id
+            user_id=session["user_id"]
         )
 
         .order_by(
-            PasswordHistory.id.desc()
+            PasswordScan.id.desc()
         )
 
-        .limit(5)
+        .first()
 
-        .all()
+    )
+
+
+    last_scan_time = (
+
+        last_scan.scan_time
+
+        if last_scan
+
+        else None
 
     )
 
@@ -1306,111 +1370,71 @@ def dashboard():
 
         total_scans=total_scans,
 
+        average_score=average_score,
+
+        strong_passwords=strong_passwords,
+
+        strong_percentage=strong_percentage,
+
+        last_scan_time=last_scan_time,
+
         weak_count=weak_count,
 
         medium_count=medium_count,
 
         strong_count=strong_count,
 
-        recent_scans=recent_scans
+        very_strong_count=very_strong_count
 
     )
 
 
-# ==================================================
-# PASSWORD GENERATOR
-# ==================================================
-
-@app.route(
-    "/generate_password",
-    methods=["GET", "POST"]
-)
-def generate_password_route():
-
-    if not is_logged_in():
-
-        return redirect(
-            url_for("login")
-        )
-
-
-    generated_password = None
-
-
-    if request.method == "POST":
-
-        try:
-
-            length = int(
-                request.form.get(
-                    "length",
-                    14
-                )
-            )
-
-        except ValueError:
-
-            length = 14
-
-
-        generated_password = generate_password(
-
-            length=length,
-
-            use_upper=bool(
-                request.form.get(
-                    "use_upper"
-                )
-            ),
-
-            use_lower=bool(
-                request.form.get(
-                    "use_lower"
-                )
-            ),
-
-            use_digits=bool(
-                request.form.get(
-                    "use_digits"
-                )
-            ),
-
-            use_special=bool(
-                request.form.get(
-                    "use_special"
-                )
-            )
-
-        )
-
-
-    return render_template(
-
-        "generator.html",
-
-        generated_password=generated_password
-
-    )
-
-
-# ==================================================
-# POLICY
-# ==================================================
+# =========================================================
+# PASSWORD POLICY
+# =========================================================
 
 @app.route(
     "/policy",
-    methods=["GET", "POST"]
+    methods=[
+        "GET",
+        "POST"
+    ]
 )
+@login_required
 def policy():
 
-    if not is_logged_in():
+    user_policy = PasswordPolicy.query.filter_by(
 
-        return redirect(
-            url_for("login")
+        user_id=session["user_id"]
+
+    ).first()
+
+
+    if not user_policy:
+
+        user_policy = PasswordPolicy(
+
+            user_id=session["user_id"],
+
+            min_length=8,
+
+            require_uppercase=True,
+
+            require_lowercase=True,
+
+            require_number=True,
+
+            require_special=True
+
         )
 
 
-    user_id = get_current_user_id()
+        db.session.add(
+            user_policy
+        )
+
+
+        db.session.commit()
 
 
     if request.method == "POST":
@@ -1418,198 +1442,128 @@ def policy():
         try:
 
             min_length = int(
+
                 request.form.get(
                     "min_length",
                     8
                 )
+
             )
 
-        except ValueError:
 
-            min_length = 8
+            user_policy.min_length = max(
+
+                6,
+
+                min(
+                    min_length,
+                    64
+                )
+
+            )
 
 
-        min_length = max(
-            4,
-            min(min_length, 128)
-        )
+            user_policy.require_uppercase = (
 
-
-        update_user_policy(
-
-            user_id,
-
-            min_length,
-
-            1 if request.form.get(
                 "require_uppercase"
-            ) else 0,
+                in request.form
 
-            1 if request.form.get(
+            )
+
+
+            user_policy.require_lowercase = (
+
                 "require_lowercase"
-            ) else 0,
+                in request.form
 
-            1 if request.form.get(
-                "require_digit"
-            ) else 0,
+            )
 
-            1 if request.form.get(
+
+            user_policy.require_number = (
+
+                "require_number"
+                in request.form
+
+            )
+
+
+            user_policy.require_special = (
+
                 "require_special"
-            ) else 0
+                in request.form
 
-        )
-
-
-        flash(
-            "Password policy updated successfully.",
-            "success"
-        )
+            )
 
 
-        return redirect(
-            url_for("policy")
-        )
+            db.session.commit()
+
+
+            flash(
+                "Password policy updated.",
+                "success"
+            )
+
+
+            return redirect(
+                url_for("policy")
+            )
+
+
+        except Exception as error:
+
+            db.session.rollback()
+
+
+            print(
+                "POLICY ERROR:",
+                repr(error)
+            )
+
+
+            flash(
+                "Unable to update policy.",
+                "danger"
+            )
 
 
     return render_template(
 
         "policy.html",
 
-        policy=get_user_policy(
-            user_id
-        )
+        policy=user_policy
 
     )
 
 
-# ==================================================
-# EXPORT CSV
-# ==================================================
+# =========================================================
+# PDF EXPORT
+# =========================================================
 
-@app.route("/export_csv")
-def export_csv():
-
-    if not is_logged_in():
-
-        return redirect(
-            url_for("login")
-        )
-
-
-    records = (
-
-        PasswordHistory.query
-
-        .filter_by(
-            user_id=get_current_user_id()
-        )
-
-        .order_by(
-            PasswordHistory.id.desc()
-        )
-
-        .all()
-
-    )
-
-
-    output = StringIO()
-
-    writer = csv.writer(output)
-
-
-    writer.writerow([
-        "ID",
-        "Password",
-        "Score",
-        "Strength",
-        "Color",
-        "Entropy",
-        "Estimated Crack Time",
-        "Scan Time"
-    ])
-
-
-    for row in records:
-
-        writer.writerow([
-
-            row.id,
-
-            row.password_text,
-
-            row.score,
-
-            row.strength,
-
-            row.color,
-
-            row.entropy,
-
-            row.crack_time,
-
-            row.scan_time
-
-        ])
-
-
-    mem = BytesIO(
-        output.getvalue().encode(
-            "utf-8"
-        )
-    )
-
-    mem.seek(0)
-
-
-    return send_file(
-
-        mem,
-
-        mimetype="text/csv",
-
-        as_attachment=True,
-
-        download_name="password_history.csv"
-
-    )
-
-
-# ==================================================
-# EXPORT PDF
-# ==================================================
-
-@app.route("/export_pdf")
+@app.route("/export-pdf")
+@login_required
 def export_pdf():
 
-    if not is_logged_in():
+    result = session.get(
+        "last_result"
+    )
+
+
+    if not result:
+
+        flash(
+            "Analyze a password first.",
+            "warning"
+        )
 
         return redirect(
-            url_for("login")
+            url_for("index")
         )
-
-
-    records = (
-
-        PasswordHistory.query
-
-        .filter_by(
-            user_id=get_current_user_id()
-        )
-
-        .order_by(
-            PasswordHistory.id.desc()
-        )
-
-        .all()
-
-    )
 
 
     buffer = BytesIO()
 
 
-    doc = SimpleDocTemplate(
+    document = SimpleDocTemplate(
 
         buffer,
 
@@ -1621,14 +1575,14 @@ def export_pdf():
     styles = getSampleStyleSheet()
 
 
-    elements = []
+    content = []
 
 
-    elements.append(
+    content.append(
 
         Paragraph(
 
-            "Cyber Password Security Engine - Password Report",
+            "Hexa Shield Security Report",
 
             styles["Title"]
 
@@ -1637,16 +1591,16 @@ def export_pdf():
     )
 
 
-    elements.append(
-        Spacer(1, 12)
+    content.append(
+        Spacer(1, 20)
     )
 
 
-    elements.append(
+    content.append(
 
         Paragraph(
 
-            f"User: {session.get('username')}",
+            f"Security Score: {result['score']}/5",
 
             styles["Normal"]
 
@@ -1655,14 +1609,16 @@ def export_pdf():
     )
 
 
-    elements.append(
+    content.append(
+        Spacer(1, 10)
+    )
+
+
+    content.append(
 
         Paragraph(
 
-            "Generated on: "
-            + datetime.now().strftime(
-                "%d-%m-%Y %I:%M:%S %p"
-            ),
+            f"Password Strength: {result['strength']}",
 
             styles["Normal"]
 
@@ -1671,105 +1627,114 @@ def export_pdf():
     )
 
 
-    elements.append(
-        Spacer(1, 12)
+    content.append(
+        Spacer(1, 10)
     )
 
 
-    table_data = [[
+    content.append(
 
-        "Password",
+        Paragraph(
 
-        "Score",
+            f"Entropy: {result['entropy']} bits",
 
-        "Strength",
+            styles["Normal"]
 
-        "Entropy",
-
-        "Crack Time",
-
-        "Scan Time"
-
-    ]]
-
-
-    for row in records:
-
-        table_data.append([
-
-            row.password_text,
-
-            row.score,
-
-            row.strength,
-
-            row.entropy,
-
-            row.crack_time,
-
-            row.scan_time
-
-        ])
-
-
-    table = Table(
-
-        table_data,
-
-        repeatRows=1
+        )
 
     )
 
 
-    table.setStyle(
+    content.append(
+        Spacer(1, 10)
+    )
 
-        TableStyle([
 
-            (
-                "BACKGROUND",
-                (0, 0),
-                (-1, 0),
-                colors.black
-            ),
+    content.append(
 
-            (
-                "TEXTCOLOR",
-                (0, 0),
-                (-1, 0),
-                colors.white
-            ),
+        Paragraph(
 
-            (
-                "GRID",
-                (0, 0),
-                (-1, -1),
-                1,
-                colors.grey
-            ),
+            f"Estimated Crack Time: {result['crack_time']}",
 
-            (
-                "FONTSIZE",
-                (0, 0),
-                (-1, -1),
-                8
-            ),
+            styles["Normal"]
 
-            (
-                "BACKGROUND",
-                (0, 1),
-                (-1, -1),
-                colors.whitesmoke
+        )
+
+    )
+
+
+    breach_status = (
+
+        "Detected"
+
+        if result["breached"]
+
+        else "Not Detected"
+
+    )
+
+
+    content.append(
+        Spacer(1, 10)
+    )
+
+
+    content.append(
+
+        Paragraph(
+
+            f"Known Breach Status: {breach_status}",
+
+            styles["Normal"]
+
+        )
+
+    )
+
+
+    content.append(
+        Spacer(1, 20)
+    )
+
+
+    content.append(
+
+        Paragraph(
+
+            "Security Recommendations",
+
+            styles["Heading2"]
+
+        )
+
+    )
+
+
+    for recommendation in result[
+        "recommendations"
+    ]:
+
+        content.append(
+
+            Paragraph(
+
+                f"- {recommendation}",
+
+                styles["Normal"]
+
             )
 
-        ])
+        )
 
+
+        content.append(
+            Spacer(1, 5)
+        )
+
+
+    document.build(
+        content
     )
-
-
-    elements.append(table)
-
-
-    doc.build(elements)
 
 
     buffer.seek(0)
@@ -1781,24 +1746,164 @@ def export_pdf():
 
         as_attachment=True,
 
-        download_name="password_report.pdf",
+        download_name=(
+            "hexa_shield_report.pdf"
+        ),
 
         mimetype="application/pdf"
 
     )
 
 
-# ==================================================
-# APP STARTUP
-# ==================================================
+# =========================================================
+# ADMIN
+# =========================================================
 
-with app.app_context():
+@app.route("/admin")
+@login_required
+@admin_required
+def admin():
 
-    init_db()
+    users = User.query.order_by(
 
-    create_default_user_if_needed()
+        User.id.desc()
 
+    ).all()
+
+
+    total_users = User.query.count()
+
+
+    total_scans = PasswordScan.query.count()
+
+
+    return render_template(
+
+        "admin.html",
+
+        users=users,
+
+        total_users=total_users,
+
+        total_scans=total_scans
+
+    )
+
+
+# =========================================================
+# DELETE USER
+# =========================================================
+
+@app.route(
+    "/admin/delete-user/<int:user_id>"
+)
+@login_required
+@admin_required
+def delete_user(user_id):
+
+    if user_id == session["user_id"]:
+
+        flash(
+            "You cannot delete your own account.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+
+    user = db.session.get(
+        User,
+        user_id
+    )
+
+
+    if not user:
+
+        flash(
+            "User not found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+
+    PasswordScan.query.filter_by(
+
+        user_id=user.id
+
+    ).delete()
+
+
+    PasswordPolicy.query.filter_by(
+
+        user_id=user.id
+
+    ).delete()
+
+
+    db.session.delete(
+        user
+    )
+
+
+    db.session.commit()
+
+
+    flash(
+        "User deleted successfully.",
+        "success"
+    )
+
+
+    return redirect(
+        url_for("admin")
+    )
+
+
+# =========================================================
+# LOGOUT
+# =========================================================
+
+@app.route("/logout")
+def logout():
+
+    session.clear()
+
+
+    flash(
+        "Logged out successfully.",
+        "success"
+    )
+
+
+    return redirect(
+        url_for("login")
+    )
+
+
+# =========================================================
+# DATABASE START
+# =========================================================
+
+update_database()
+
+
+# =========================================================
+# RUN APP
+# =========================================================
 
 if __name__ == "__main__":
 
-    app.run(debug=True)
+    app.run(
+
+        host="127.0.0.1",
+
+        port=5000,
+
+        debug=True
+
+    )

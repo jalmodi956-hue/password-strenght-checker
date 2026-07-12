@@ -1,71 +1,362 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Generator - Cyber Password Security Engine</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <title>Password Generator | Hexa Shield</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
+
 <body>
-    <div class="cyber-bg"></div>
 
-    <div class="container">
-        <h1 class="page-title">PASSWORD GENERATOR</h1>
-        <p class="page-subtitle">Generate strong passwords with custom settings.</p>
+<nav class="navbar">
+    <div class="container admin-header">
 
-        <div class="nav-links" style="margin-top:0; margin-bottom:20px;">
-            <a href="{{ url_for('index') }}">🏠 Home</a>
-            <a href="{{ url_for('history') }}">📜 History</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('policy') }}">⚙ Policy</a>
-            <a href="{{ url_for('logout') }}">🚪 Logout</a>
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+            <i class="fa-solid fa-shield-halved"></i>
+            Hexa Shield
+        </a>
+
+        <div>
+            <a class="nav-link" href="{{ url_for('index') }}">Analyzer</a>
+            <a class="nav-link" href="{{ url_for('generator') }}">Generator</a>
+            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a class="nav-link" href="{{ url_for('history') }}">History</a>
+            <a class="nav-link" href="{{ url_for('policy') }}">Policy</a>
+
+            {% if session.get('is_admin') %}
+            <a class="nav-link" href="{{ url_for('admin') }}">Admin</a>
+            {% endif %}
+
+            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
         </div>
 
-        <form method="POST" class="panel-box neon-box">
-            <h3>GENERATOR SETTINGS</h3>
-
-            <div class="form-group">
-                <label for="length">Password Length</label>
-                <input type="number" name="length" id="length" min="6" max="64" value="14" required>
-            </div>
-
-            <div class="checkbox-grid">
-                <label class="checkbox-item">
-                    <input type="checkbox" name="use_upper" checked>
-                    Include Uppercase Letters
-                </label>
-
-                <label class="checkbox-item">
-                    <input type="checkbox" name="use_lower" checked>
-                    Include Lowercase Letters
-                </label>
-
-                <label class="checkbox-item">
-                    <input type="checkbox" name="use_digits" checked>
-                    Include Numbers
-                </label>
-
-                <label class="checkbox-item">
-                    <input type="checkbox" name="use_special" checked>
-                    Include Special Characters
-                </label>
-            </div>
-
-            <button type="submit" class="btn btn-primary mt-20">Generate Password</button>
-        </form>
-
-        {% if generated_password %}
-        <div class="generated-password-box neon-box">
-            <h3>GENERATED PASSWORD</h3>
-            <code id="generatedPasswordText">{{ generated_password }}</code>
-            <div style="margin-top:15px;">
-                <button type="button" class="btn btn-success" id="copyGeneratedPassword">Copy Generated Password</button>
-            </div>
-        </div>
-        {% endif %}
     </div>
+</nav>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<main class="container main-container">
+
+    <section class="hero">
+
+        <h1>Secure Password Generator</h1>
+
+        <p>
+            Generate strong and random passwords based on your
+            security requirements.
+        </p>
+
+    </section>
+
+
+    <section class="analyzer-card">
+
+        <h2 class="section-title">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            Password Generator
+        </h2>
+
+
+        <label for="passwordLength">
+            <i class="fa-solid fa-ruler"></i>
+            Password Length
+        </label>
+
+        <input type="number"
+               id="passwordLength"
+               min="8"
+               max="64"
+               value="16">
+
+
+        <div class="requirements">
+
+            <label class="requirement">
+
+                <input type="checkbox"
+                       id="includeUppercase"
+                       checked>
+
+                <span>Include Uppercase Letters (A-Z)</span>
+
+            </label>
+
+
+            <label class="requirement">
+
+                <input type="checkbox"
+                       id="includeLowercase"
+                       checked>
+
+                <span>Include Lowercase Letters (a-z)</span>
+
+            </label>
+
+
+            <label class="requirement">
+
+                <input type="checkbox"
+                       id="includeNumbers"
+                       checked>
+
+                <span>Include Numbers (0-9)</span>
+
+            </label>
+
+
+            <label class="requirement">
+
+                <input type="checkbox"
+                       id="includeSpecial"
+                       checked>
+
+                <span>Include Special Characters</span>
+
+            </label>
+
+        </div>
+
+
+        <button type="button"
+                class="btn btn-primary full-btn"
+                style="margin-top:25px;"
+                onclick="generateCustomPassword()">
+
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+
+            Generate Secure Password
+
+        </button>
+
+
+        <div class="result-card"
+             style="margin-top:25px;">
+
+            <label>
+                <i class="fa-solid fa-key"></i>
+                Generated Password
+            </label>
+
+
+            <div class="password-wrapper">
+
+                <input type="text"
+                       id="generatedPassword"
+                       placeholder="Your generated password will appear here"
+                       readonly>
+
+
+                <span class="toggle-password"
+                      onclick="copyGeneratedPassword()">
+
+                    <i class="fa-solid fa-copy"></i>
+
+                </span>
+
+            </div>
+
+
+            <button type="button"
+                    class="btn btn-secondary full-btn"
+                    onclick="copyGeneratedPassword()">
+
+                <i class="fa-solid fa-copy"></i>
+
+                Copy Password
+
+            </button>
+
+        </div>
+
+
+        <div id="generatorMessage"
+             class="alert alert-success"
+             style="display:none; margin-top:20px;">
+
+            <i class="fa-solid fa-circle-check"></i>
+
+            Password copied successfully.
+
+        </div>
+
+    </section>
+
+
+    <section class="result-card">
+
+        <h2>
+            <i class="fa-solid fa-shield-halved"></i>
+            Password Security Tips
+        </h2>
+
+
+        <div class="requirements">
+
+            <div class="requirement valid">
+                <i class="fa-solid fa-circle-check"></i>
+                Use at least 12-16 characters.
+            </div>
+
+            <div class="requirement valid">
+                <i class="fa-solid fa-circle-check"></i>
+                Use a unique password for every account.
+            </div>
+
+            <div class="requirement valid">
+                <i class="fa-solid fa-circle-check"></i>
+                Avoid personal information in passwords.
+            </div>
+
+            <div class="requirement valid">
+                <i class="fa-solid fa-circle-check"></i>
+                Use a trusted password manager.
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<footer>
+
+    <p>
+        <i class="fa-solid fa-shield-halved"></i>
+        Hexa Shield Password Security Platform
+    </p>
+
+</footer>
+
+
+<button class="theme-toggle"
+        id="themeToggle"
+        type="button">
+
+    <i class="fa-solid fa-moon"></i>
+
+</button>
+
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+
+<script>
+
+function generateCustomPassword() {
+
+    const lengthInput = document.getElementById("passwordLength");
+
+    let length = parseInt(lengthInput.value);
+
+    if (isNaN(length) || length < 8) {
+        length = 8;
+    }
+
+    if (length > 64) {
+        length = 64;
+    }
+
+
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lowercase = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const special = "!@#$%^&*()_+-=[]{}";
+
+
+    let characters = "";
+
+
+    if (document.getElementById("includeUppercase").checked) {
+        characters += uppercase;
+    }
+
+    if (document.getElementById("includeLowercase").checked) {
+        characters += lowercase;
+    }
+
+    if (document.getElementById("includeNumbers").checked) {
+        characters += numbers;
+    }
+
+    if (document.getElementById("includeSpecial").checked) {
+        characters += special;
+    }
+
+
+    if (characters.length === 0) {
+
+        alert("Select at least one password option.");
+
+        return;
+
+    }
+
+
+    const randomValues = new Uint32Array(length);
+
+    crypto.getRandomValues(randomValues);
+
+
+    let password = "";
+
+
+    for (let i = 0; i < length; i++) {
+
+        password += characters[
+            randomValues[i] % characters.length
+        ];
+
+    }
+
+
+    document.getElementById("generatedPassword").value = password;
+
+}
+
+
+function copyGeneratedPassword() {
+
+    const password =
+        document.getElementById("generatedPassword").value;
+
+
+    if (!password) {
+
+        alert("Generate a password first.");
+
+        return;
+
+    }
+
+
+    navigator.clipboard.writeText(password);
+
+
+    const message =
+        document.getElementById("generatorMessage");
+
+
+    message.style.display = "block";
+
+
+    setTimeout(function () {
+
+        message.style.display = "none";
+
+    }, 2500);
+
+}
+
+</script>
+
 </body>
-</html>
 
+</html>

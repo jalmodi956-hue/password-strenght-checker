@@ -1,320 +1,208 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // --------------------------------
-    // Main Password Checker Elements
-    // --------------------------------
-    const passwordInput = document.getElementById("password");
-    const toggleBtn = document.getElementById("togglePassword");
-    const copyBtn = document.getElementById("copyPassword");
 
-    const strengthBar = document.getElementById("strengthBar");
-    const strengthText = document.getElementById("strengthText");
-    const scoreText = document.getElementById("scoreText");
+    // ==========================================
+    // PASSWORD SHOW / HIDE
+    // ==========================================
 
-    const liveEntropy = document.getElementById("liveEntropy");
-    const liveCrackTime = document.getElementById("liveCrackTime");
-    const liveFeedback = document.getElementById("liveFeedback");
+    const passwordInput = document.getElementById("passwordInput");
+    const togglePasswordBtn = document.getElementById("togglePasswordBtn");
 
-    // --------------------------------
-    // Password Generator Elements
-    // --------------------------------
-    const generatedPasswordText = document.getElementById("generatedPasswordText");
-    const copyGeneratedBtn = document.getElementById("copyGeneratedPassword");
-
-    // --------------------------------
-    // Weak Password List
-    // --------------------------------
-    const COMMON_WEAK_PASSWORDS = [
-        "123456", "123456789", "password", "admin", "qwerty",
-        "abc123", "letmein", "welcome", "iloveyou", "000000",
-        "password123", "admin123", "india123", "test123"
-    ];
-
-    // --------------------------------
-    // Helper Functions
-    // --------------------------------
-    function hasRepeatedChars(password) {
-        return /(.)\1{2,}/.test(password);
-    }
-
-    function hasSequence(password) {
-        const passwordLower = password.toLowerCase();
-        const sequences = [
-            "0123456789",
-            "1234567890",
-            "abcdefghijklmnopqrstuvwxyz",
-            "qwertyuiop",
-            "asdfghjkl",
-            "zxcvbnm"
-        ];
-
-        for (const seq of sequences) {
-            for (let i = 0; i < seq.length - 2; i++) {
-                const part = seq.substring(i, i + 3);
-                if (passwordLower.includes(part)) {
-                    return true;
-                }
+    if (passwordInput && togglePasswordBtn) {
+        togglePasswordBtn.addEventListener("click", function () {
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                togglePasswordBtn.textContent = "🙈";
+            } else {
+                passwordInput.type = "password";
+                togglePasswordBtn.textContent = "👁";
             }
-        }
-        return false;
+        });
     }
 
-    function hasKeyboardPattern(password) {
-        const passwordLower = password.toLowerCase();
-        const patterns = ["qwerty", "asdf", "zxcv", "qaz", "wsx", "edc"];
-        return patterns.some(pattern => passwordLower.includes(pattern));
-    }
 
-    function calculateCharsetSize(password) {
-        let charset = 0;
-        if (/[a-z]/.test(password)) charset += 26;
-        if (/[A-Z]/.test(password)) charset += 26;
-        if (/[0-9]/.test(password)) charset += 10;
-        if (/[^A-Za-z0-9]/.test(password)) charset += 32;
-        return charset;
-    }
+    // ==========================================
+    // LIVE PASSWORD REQUIREMENTS
+    // ==========================================
 
-    function calculateEntropy(password) {
-        const charset = calculateCharsetSize(password);
-        if (!password || charset === 0) return 0;
-        return (password.length * Math.log2(charset)).toFixed(2);
-    }
+    const lengthCheck = document.getElementById("lengthCheck");
+    const upperCheck = document.getElementById("upperCheck");
+    const lowerCheck = document.getElementById("lowerCheck");
+    const numberCheck = document.getElementById("numberCheck");
+    const specialCheck = document.getElementById("specialCheck");
 
-    function estimateCrackTime(entropy) {
-        entropy = parseFloat(entropy);
-        if (entropy <= 0) return "Instantly";
+    function updateRequirement(element, passed, text) {
+        if (!element) return;
 
-        const guesses = Math.pow(2, entropy);
-        const guessesPerSecond = 1000000000;
-        const seconds = guesses / guessesPerSecond;
-
-        if (seconds < 1) return "Less than 1 second";
-        if (seconds < 60) return `${Math.floor(seconds)} seconds`;
-        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
-        if (seconds < 2592000) return `${Math.floor(seconds / 86400)} days`;
-        if (seconds < 31536000) return `${Math.floor(seconds / 2592000)} months`;
-        if (seconds < 3153600000) return `${Math.floor(seconds / 31536000)} years`;
-        return "Many years";
-    }
-
-    // --------------------------------
-    // Password Strength Engine
-    // --------------------------------
-    function checkStrength(password) {
-        let score = 0;
-        let feedback = [];
-
-        if (!password) {
-            return {
-                score: 0,
-                strength: "Weak",
-                color: "#ef4444",
-                feedback: ["Please enter a password"],
-                entropy: 0,
-                crackTime: "Instantly"
-            };
-        }
-
-        // Length
-        if (password.length >= 16) score += 30;
-        else if (password.length >= 12) score += 25;
-        else if (password.length >= 8) score += 18;
-        else feedback.push("Use at least 8 characters");
-
-        // Uppercase
-        if (/[A-Z]/.test(password)) score += 12;
-        else feedback.push("Add at least one uppercase letter");
-
-        // Lowercase
-        if (/[a-z]/.test(password)) score += 12;
-        else feedback.push("Add at least one lowercase letter");
-
-        // Number
-        if (/[0-9]/.test(password)) score += 12;
-        else feedback.push("Add at least one number");
-
-        // Special character
-        if (/[!@#$%^&*(),.?":{}|<>_\-+=/\\[\];'`~]/.test(password)) score += 16;
-        else feedback.push("Add at least one special character");
-
-        // Bonus
-        const specialCount = (password.match(/[^A-Za-z0-9]/g) || []).length;
-        if (specialCount >= 2) score += 6;
-
-        if (new Set(password).size >= 8) score += 5;
-
-        // Penalties
-        if (COMMON_WEAK_PASSWORDS.includes(password.toLowerCase())) {
-            score -= 35;
-            feedback.push("This is a very common password. Avoid common passwords.");
-        }
-
-        if (hasRepeatedChars(password)) {
-            score -= 10;
-            feedback.push("Avoid repeated characters like aaa or 111");
-        }
-
-        if (hasSequence(password)) {
-            score -= 10;
-            feedback.push("Avoid easy sequences like 123, abc, qwe");
-        }
-
-        if (hasKeyboardPattern(password)) {
-            score -= 8;
-            feedback.push("Avoid keyboard patterns like qwerty or asdf");
-        }
-
-        score = Math.max(0, Math.min(score, 100));
-
-        let strength = "Weak";
-        let color = "#ef4444";
-
-        if (score <= 40) {
-            strength = "Weak";
-            color = "#ef4444";
-        } else if (score <= 75) {
-            strength = "Medium";
-            color = "#f59e0b";
+        if (passed) {
+            element.innerHTML = "✅ " + text;
+            element.classList.add("text-success");
+            element.classList.remove("text-danger");
         } else {
-            strength = "Strong";
-            color = "#22c55e";
+            element.innerHTML = "❌ " + text;
+            element.classList.add("text-danger");
+            element.classList.remove("text-success");
         }
-
-        const entropy = calculateEntropy(password);
-        const crackTime = estimateCrackTime(entropy);
-
-        if (entropy < 40) {
-            feedback.push("Entropy is low. Use a longer and less predictable password.");
-        } else if (entropy >= 60 && score >= 75) {
-            feedback.push("Good entropy level. This password is relatively strong.");
-        }
-
-        return {
-            score,
-            strength,
-            color,
-            feedback,
-            entropy,
-            crackTime
-        };
-    }
-
-    // --------------------------------
-    // Render Live Feedback
-    // --------------------------------
-    function renderLiveFeedback(feedback) {
-        if (!liveFeedback) return;
-
-        if (!feedback || feedback.length === 0) {
-            liveFeedback.innerHTML = `<li>Excellent. Your password currently looks strong.</li>`;
-            return;
-        }
-
-        const limited = feedback.slice(0, 4);
-        liveFeedback.innerHTML = limited.map(item => `<li>${item}</li>`).join("");
-    }
-
-    // --------------------------------
-    // Update Strength UI
-    // --------------------------------
-    function updateStrengthUI() {
-        if (!passwordInput || !strengthBar || !strengthText || !scoreText) return;
-
-        const password = passwordInput.value;
-        const result = checkStrength(password);
-
-        strengthBar.style.width = result.score + "%";
-        strengthBar.style.background = result.color;
-
-        strengthText.textContent = result.strength;
-        strengthText.style.color = result.color;
-
-        scoreText.textContent = result.score + "/100";
-
-        if (liveEntropy) {
-            liveEntropy.textContent = result.entropy;
-        }
-
-        if (liveCrackTime) {
-            liveCrackTime.textContent = result.crackTime;
-        }
-
-        renderLiveFeedback(result.feedback);
     }
 
     if (passwordInput) {
-        passwordInput.addEventListener("input", updateStrengthUI);
+        passwordInput.addEventListener("input", function () {
+            const password = passwordInput.value;
+
+            updateRequirement(
+                lengthCheck,
+                password.length >= 8,
+                "At least 8 characters"
+            );
+
+            updateRequirement(
+                upperCheck,
+                /[A-Z]/.test(password),
+                "Uppercase letter"
+            );
+
+            updateRequirement(
+                lowerCheck,
+                /[a-z]/.test(password),
+                "Lowercase letter"
+            );
+
+            updateRequirement(
+                numberCheck,
+                /[0-9]/.test(password),
+                "Number"
+            );
+
+            updateRequirement(
+                specialCheck,
+                /[^A-Za-z0-9]/.test(password),
+                "Special character"
+            );
+        });
     }
 
-    // --------------------------------
-    // Show / Hide Password
-    // --------------------------------
-    if (toggleBtn && passwordInput) {
-        toggleBtn.addEventListener("click", function () {
-            if (passwordInput.type === "password") {
-                passwordInput.type = "text";
-                toggleBtn.textContent = "Hide";
-            } else {
-                passwordInput.type = "password";
-                toggleBtn.textContent = "Show";
+
+    // ==========================================
+    // COPY GENERATED PASSWORD
+    // ==========================================
+
+    const copyPasswordBtn = document.getElementById("copyPasswordBtn");
+    const generatedPassword = document.getElementById("generatedPassword");
+
+    if (copyPasswordBtn && generatedPassword) {
+        copyPasswordBtn.addEventListener("click", async function () {
+            try {
+                await navigator.clipboard.writeText(
+                    generatedPassword.value
+                );
+
+                const oldText = copyPasswordBtn.innerHTML;
+
+                copyPasswordBtn.innerHTML = "✅ Copied";
+
+                setTimeout(function () {
+                    copyPasswordBtn.innerHTML = oldText;
+                }, 2000);
+
+            } catch (error) {
+                alert("Unable to copy password.");
             }
         });
     }
 
-    // --------------------------------
-    // Copy Main Password
-    // --------------------------------
-    if (copyBtn && passwordInput) {
-        copyBtn.addEventListener("click", function () {
-            const value = passwordInput.value.trim();
 
-            if (!value) {
-                alert("Please enter a password first.");
-                return;
+    // ==========================================
+    // DELETE HISTORY CONFIRMATION
+    // ==========================================
+
+    const deleteForms = document.querySelectorAll(".delete-history-form");
+
+    deleteForms.forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+            const confirmed = confirm(
+                "Are you sure you want to delete this scan?"
+            );
+
+            if (!confirmed) {
+                event.preventDefault();
             }
+        });
+    });
 
-            navigator.clipboard.writeText(value)
-                .then(() => {
-                    const oldText = copyBtn.textContent;
-                    copyBtn.textContent = "Copied!";
-                    setTimeout(() => {
-                        copyBtn.textContent = oldText || "Copy";
-                    }, 1500);
-                })
-                .catch(() => {
-                    alert("Failed to copy password.");
-                });
+
+    // ==========================================
+    // CLEAR HISTORY CONFIRMATION
+    // ==========================================
+
+    const clearHistoryForm = document.getElementById("clearHistoryForm");
+
+    if (clearHistoryForm) {
+        clearHistoryForm.addEventListener("submit", function (event) {
+            const confirmed = confirm(
+                "Are you sure you want to clear all scan history?"
+            );
+
+            if (!confirmed) {
+                event.preventDefault();
+            }
         });
     }
 
-    // --------------------------------
-    // Copy Generated Password
-    // --------------------------------
-    if (copyGeneratedBtn && generatedPasswordText) {
-        copyGeneratedBtn.addEventListener("click", function () {
-            const value = generatedPasswordText.textContent.trim();
 
-            if (!value) {
-                alert("No generated password found.");
-                return;
+    // ==========================================
+    // ADMIN DELETE USER CONFIRMATION
+    // ==========================================
+
+    const deleteUserForms = document.querySelectorAll(".delete-user-form");
+
+    deleteUserForms.forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+            const confirmed = confirm(
+                "Delete this user and all related scan data?"
+            );
+
+            if (!confirmed) {
+                event.preventDefault();
             }
+        });
+    });
 
-            navigator.clipboard.writeText(value)
-                .then(() => {
-                    const oldText = copyGeneratedBtn.textContent;
-                    copyGeneratedBtn.textContent = "Copied!";
-                    setTimeout(() => {
-                        copyGeneratedBtn.textContent = oldText || "Copy";
-                    }, 1500);
-                })
-                .catch(() => {
-                    alert("Failed to copy generated password.");
-                });
+
+    // ==========================================
+    // AUTO HIDE FLASH MESSAGES
+    // ==========================================
+
+    const flashMessages = document.querySelectorAll(".alert-dismissible");
+
+    flashMessages.forEach(function (message) {
+        setTimeout(function () {
+            const bootstrapAlert =
+                bootstrap.Alert.getOrCreateInstance(message);
+
+            bootstrapAlert.close();
+        }, 5000);
+    });
+
+
+    // ==========================================
+    // FORM SUBMIT LOADING STATE
+    // ==========================================
+
+    const scanForm = document.querySelector(
+        'form[action=""], form[data-scan-form]'
+    );
+
+    if (scanForm) {
+        scanForm.addEventListener("submit", function () {
+            const submitButton = scanForm.querySelector(
+                'button[type="submit"]'
+            );
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML =
+                    "🔍 Analyzing Security...";
+            }
         });
     }
 
-    // --------------------------------
-    // Initial Render
-    // --------------------------------
-    updateStrengthUI();
 });
